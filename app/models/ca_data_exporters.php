@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2012-2019 Whirl-i-Gig
+ * Copyright 2012-2020 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -1810,7 +1810,7 @@ class ca_data_exporters extends BundlableLabelableBaseModelWithAttributes {
 		}
 
 		// always return URL for export, not an HTML tag
-		$va_get_options = array('returnURL' => true);
+		$va_get_options = array('returnURL' => true, 'filterNonPrimaryRepresentations' => false);
 
 		if($vs_delimiter = $t_exporter_item->getSetting("delimiter")) {
 			$va_get_options['delimiter'] = $vs_delimiter;
