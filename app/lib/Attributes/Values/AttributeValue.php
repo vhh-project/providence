@@ -46,6 +46,7 @@ abstract class AttributeValue extends BaseObject {
 	private $opn_value_id;
 	private $opa_source_info;
 	private $ops_sort_value;
+	private $ops_value_source;
 
 	# ------------------------------------------------------------------
 	public function __construct($pa_value_array=null) {
@@ -61,6 +62,7 @@ abstract class AttributeValue extends BaseObject {
 		$this->opn_datatype = isset($pa_value_array['datatype']) ? $pa_value_array['datatype'] : null;
 		$this->opn_value_id = isset($pa_value_array['value_id']) ? $pa_value_array['value_id'] : null;
 		$this->opa_source_info = isset($pa_value_array['source_info']) ? $pa_value_array['source_info'] : null;
+        $this->ops_value_source = isset($pa_value_array['value_source']) ? $pa_value_array['value_source'] : null;
 
 		$this->loadTypeSpecificValueFromRow($pa_value_array);
 
@@ -100,6 +102,10 @@ abstract class AttributeValue extends BaseObject {
 	public function getValueID() {
 		return $this->opn_value_id;
 	}
+	# ------------------------------------------------------------------
+    public function getValueSource() {
+        return $this->ops_value_source;
+    }
 	# ------------------------------------------------------------------
 	protected function getSettingValuesFromElementArray($pa_element_info, $pa_settings) {
 		if (!is_array($pa_settings)) { $pa_settings = array($pa_settings); }

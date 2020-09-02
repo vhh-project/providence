@@ -251,6 +251,9 @@ var caUI = caUI || {};
 
 			// replace values in template
 			var jElement = jQuery(this.container + ' textarea.' + (isNew ? this.templateClassName : this.initialValueTemplateClassName)).template(templateValues);
+			// Quick hack to inject ValueSource into the UI: (DELME)
+			jElement.find('tbody:last').append('<tr><td>ValueSource: '+templateValues['value_source'] +'</td></tr>');
+
 
 			if(options.useAnimation) {
 				jQuery(jElement).hide();

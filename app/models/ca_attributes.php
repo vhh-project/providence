@@ -608,7 +608,8 @@ class ca_attributes extends BaseModel {
 				caa.attribute_id, caa.locale_id, caa.element_id element_set_id, caa.row_id,
 				caav.value_id, caav.item_id, caav.value_longtext1, caav.value_longtext2,
 				caav.value_decimal1, caav.value_decimal2, caav.value_integer1, caav.value_blob,
-				caav.element_id
+				caav.element_id,
+				caa.value_source
 			FROM ca_attributes caa
 			INNER JOIN ca_attribute_values AS caav ON caa.attribute_id = caav.attribute_id
 			WHERE
