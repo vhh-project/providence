@@ -439,6 +439,14 @@ class BaseEditorController extends ActionController {
 			Session::setVar('save_and_return_locations', caPushToStack($va_save, $va_save_and_return, __CA_SAVE_AND_RETURN_STACK_SIZE__));
 		}
 
+        // If a ValueSource for an attribute is present, save/update it in the database:
+        if (!empty($_POST['value_source'])) {
+            foreach ($_POST['value_source'] as $valueSourceId => $valueSource) {
+                $o_db = new Db();
+                $o_db->query("UPDATE ca_attributes SET value_source=\"".$valueSource."\" WHERE attribute_id = ".$valueSourceId, []);
+            }
+        }
+
 		// if we came here through a rel link, show save and return button
 		$this->getView()->setVar('show_save_and_return', (bool) $this->getRequest()->getParameter('rel', pInteger));
 

@@ -7721,3 +7721,12 @@ div.mediaMetadataActionButton a, div.mediaMetadataActionButton span a {
     text-decoration: none;
     color: #000;
 }
+
+div.caValueSource {
+    padding: 0px 8px 0px 0px;
+}
+
+input.caValueSource {
+    background-color: #ffc;
+    width: 100%;
+}

@@ -96,12 +96,31 @@
 		$va_item_ids = array();
 		foreach ($va_attribute_list as $o_attr) {
 			$va_initial_values[$o_attr->getAttributeID()] = array();
+
+			// Read data ValueSource for each attribute:
+			$o_db = new Db();
+			$value_sources = $o_db->query(
+				"SELECT value_source FROM ca_attributes WHERE attribute_id = ?",
+				[$o_attr->getAttributeID()]
+			);
+			$value_sources = $value_sources->getAllFieldValues('value_source');
+
+			if (!empty($value_sources)) {
+				$value_source = $value_sources[0];
+			} else {
+				$value_source = '';
+			}
+
+			// Make the ValueSource data available as JavaScript variable:
+			echo '<script>if (!window.valueSources) {window.valueSources = {};} window.valueSources["'.$o_attr->getAttributeID().'"] = "'.$value_source.'"</script>';
+
+			// Continue iterating through regular data values:
 			foreach($o_attr->getValues() as $o_value) {
 				$vn_attr_id = $o_attr->getAttributeID();
 				$vn_element_id = $o_value->getElementID();
-				
+
 				$attr_table = method_exists($o_value, 'tableName') ? $o_value->tableName() : null;
-				
+
 				if ($va_failed_updates[$vn_attr_id] && !in_array($o_value->getDatatype(), array(
 					__CA_ATTRIBUTE_VALUE_LCSH__, 
 					__CA_ATTRIBUTE_VALUE_OBJECTS__,
