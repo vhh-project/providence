@@ -79,6 +79,13 @@ BaseModel::$s_ca_models_definitions['ca_attributes'] = array(
 				'IS_NULL' => false, 
 				'DEFAULT' => '',
 				'LABEL' => 'Row id', 'DESCRIPTION' => 'Identifier of row to which this attibute is applied.'
+		),
+		'value_source' => array(
+				'FIELD_TYPE' => FT_TEXT, 'DISPLAY_TYPE' => DT_FIELD,
+				'DISPLAY_WIDTH' => 88, 'DISPLAY_HEIGHT' => 15,
+				'IS_NULL' => false,
+				'DEFAULT' => '',
+				'LABEL' => 'Value source', 'DESCRIPTION' => 'Source of data value (for scientific citation).'
 		)
 	)
 );
@@ -347,7 +354,7 @@ class ca_attributes extends BaseModel {
 		}
 		
 		unset(ca_attributes::$s_get_attributes_cache[$this->get('table_num').'/'.$this->get('row_id')]);
-		
+
 		$this->setMode(ACCESS_WRITE);
 		
 		// Force default of locale-less attributes to current user locale if possible

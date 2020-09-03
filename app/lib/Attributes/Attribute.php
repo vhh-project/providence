@@ -74,10 +74,16 @@ define("__CA_ATTRIBUTE_VALUE_OBJECTLOTS__", 30);
  		private $opn_attribute_id;
  		private $opn_element_id;
  		private $opn_locale_id;
+		private $ops_value_source;
  		
  		static $s_instance_cache = array();
  		static $s_attribute_types = array();
  		
+		# ------------------------------------------------------------------
+		# VHH
+		public function getValueSource() {
+			return $this->ops_value_source;
+		}
  		# ------------------------------------------------------------------
  		/**
  		 *
@@ -93,15 +99,21 @@ define("__CA_ATTRIBUTE_VALUE_OBJECTLOTS__", 30);
  		}
  		# ------------------------------------------------------------------
  		/**
- 		 *
+ 		 * Initializes properties of this Attribute instance.
  		 *
  		 * @param array $pa_values
  		 */
- 		public function setInfo($pa_values) {
- 			foreach($pa_values as $vs_key => $vs_val) {
- 				if (!in_array($vs_key, array('attribute_id', 'element_id', 'locale_id', 'table_num', 'row_id'))) { continue; }
- 				$this->{'opn_'.$vs_key} = $vs_val;
- 			}
+		public function setInfo($pa_values) {
+			foreach($pa_values as $vs_key => $vs_val) {
+				# Strings:
+				if (in_array($vs_key, array('value_source'))) {
+					$this->{'ops_'.$vs_key} = $vs_val;
+				}
+				# Numbers:
+				if (in_array($vs_key, array('attribute_id', 'element_id', 'locale_id', 'table_num', 'row_id'))) {
+					$this->{'opn_'.$vs_key} = $vs_val;
+				}
+			}
  			
  			return true;
  		}
