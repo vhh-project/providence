@@ -432,7 +432,10 @@ class ItemService extends BaseJSONService {
 						}
 						$vs_locale_code = isset($va_locales[$vn_locale_id]["code"]) ? $va_locales[$vn_locale_id]["code"] : "none";
 
-						$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code),$va_actual_data);
+						// CHANGES BY RONI -- START
+						// Adding the actual id of the attribute
+						$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code, '_id' => $vs_val_id),$va_actual_data);
+						// CHANGES BY RONI -- END
 					}
 
 				}
@@ -970,8 +973,15 @@ class ItemService extends BaseJSONService {
 			}
 		}
 
+		// CHANGES RONI - START
+		if(is_array($va_post["remove_attributes_by_id"])) {
+			foreach($va_post["remove_attributes_by_id"] as $vs_id_to_delete) {
+				$t_instance->removeAttribute($vs_id_to_delete);
+			}
+		}
 		// attributes
-		if(is_array($va_post["remove_attributes"])) {
+		else if(is_array($va_post["remove_attributes"])) {
+		// CHANGES RONI - END
 			foreach($va_post["remove_attributes"] as $vs_code_to_delete) {
 				$t_instance->removeAttributes($vs_code_to_delete);
 			}
@@ -993,6 +1003,29 @@ class ItemService extends BaseJSONService {
 				}
 			}
 		}
+
+		// CHANGES RONI - START
+		if(is_array($va_post["update_attributes"]) && sizeof($va_post["update_attributes"])) {
+			foreach($va_post["update_attributes"] as $vs_attribute_name => $va_values) {
+				foreach($va_values as $va_value) {
+					if (!empty($va_value['_id'])) {
+						$vs_attribute_id = $va_value['_id'];
+						unset($va_value['_id']);
+
+						if($va_value["locale"]) {
+							$va_value["locale_id"] = $t_locales->localeCodeToID($va_value["locale"]);
+							unset($va_value["locale"]);
+						} else {
+							// use the default locale
+							$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
+						}
+
+						$t_instance->editAttribute($vs_attribute_id, $vs_attribute_name, $va_value);
+					}
+				}
+			}
+		}
+		// CHANGES RONI - END
 
 		$t_instance->setMode(ACCESS_WRITE);
 		$t_instance->update();
