@@ -37,13 +37,10 @@ require_once(__CA_APP_DIR__."/helpers/errorHelpers.php");
 require_once(__CA_APP_DIR__."/helpers/systemHelpers.php");
 require_once(__CA_BASE_DIR__.'/vendor/autoload.php');	// composer
 
-require_once(__CA_LIB_DIR__."/Zend/Translate.php");
-require_once(__CA_LIB_DIR__."/Zend/Cache.php");
 require_once(__CA_LIB_DIR__."/Cache/MemoryCache.php"); // is used in utilityHelpers
 require_once(__CA_LIB_DIR__."/Cache/ExternalCache.php"); // is used in utilityHelpers
 require_once(__CA_LIB_DIR__."/Cache/CompositeCache.php"); // is used in utilityHelpers
 require_once(__CA_LIB_DIR__."/Cache/PersistentCache.php"); // is used in utilityHelpers
-require_once(__CA_LIB_DIR__."/Zend/Registry.php");
 
 require_once(__CA_LIB_DIR__."/Utils/Debug.php");
 require_once(__CA_APP_DIR__."/helpers/utilityHelpers.php");
@@ -95,7 +92,7 @@ spl_autoload_register(function ($class) {
     }
     
     // search common locations for class
-    $paths = [__CA_LIB_DIR__, __CA_LIB_DIR__.'/Utils', __CA_LIB_DIR__.'/Parsers'];
+    $paths = [__CA_LIB_DIR__, __CA_LIB_DIR__.'/Utils', __CA_LIB_DIR__.'/Parsers', __CA_LIB_DIR__.'/Media'];
     foreach($paths as $path) {
         if(file_exists("{$path}/{$class}.php")) {
             if(require("{$path}/{$class}.php")) { return true; }   
