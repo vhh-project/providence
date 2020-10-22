@@ -295,6 +295,11 @@ div.clear {
 #leftNav .resultLink  {
 	display: inline-block;
 	width: 110px;
+	color: #1ab3c8;
+}
+#leftNav .resultLink:hover  {
+	color: #1ab3c8;
+	text-decoration:underline;
 }
 #leftNav .creatingNew {
 	font-family: "DIN-Regular", Helvetica, sans-serif;
@@ -7722,6 +7727,10 @@ div.mediaMetadataActionButton a, div.mediaMetadataActionButton span a {
     color: #000;
 }
 
+p.abbreviatedPath, div.abbreviatedPath, span.abbreviatedPath {
+	cursor: help;
+}
+
 div.caValueSource {
     padding: 0px 8px 0px 0px;
 }
@@ -7729,4 +7738,3 @@ div.caValueSource {
 input.caValueSource {
     background-color: #ffc;
     width: 100%;
-}
