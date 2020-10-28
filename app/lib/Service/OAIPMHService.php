@@ -495,20 +495,34 @@ class OAIPMHService extends BaseService {
 		$o_tep = new TimeExpressionParser();
 		$o_lang_settings = $o_tep->getLanguageSettings();
 		$vs_conj = array_shift($o_lang_settings->getList("rangeConjunctions"));
-		$vs_range = ($from && $until) ? "{$from} {$vs_conj} {$until}" : '';
-   
-		if (($set && $this->opa_provider_info['setFacet']) || $vs_range) {
-			$o_browse = caGetBrowseInstance($this->table);
+		$vs_present = array_shift($o_lang_settings->getList("presentDate"));
+		if ($from && $until) {
+			$vs_range = "{$from} {$vs_conj} {$until}";
+		} elseif($from) {
+			$vs_range = "{$from} {$vs_conj} {$vs_present}";
+		} else {
+			$vs_range = null;
+		}
 		
-			if ($vs_query = $this->opa_provider_info['query']) {
-				$o_browse->addCriteria("_search", $vs_query);
-			}
+		$vs_query = $this->opa_provider_info['query'];
+		if (($set && $this->opa_provider_info['setFacet']) || $vs_range) {
+			if($vs_query === '*') {
+				$o_search = caGetSearchInstance($this->table);
+				
+				$qr_res = $o_search->search($vs_range ? 'modified:"'.$vs_range.'"' : '*', array('showDeleted' => $vb_show_deleted, 'no_cache' => $vb_dont_cache, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values, 'dontFilterByACL' => $this->opa_provider_info['dontFilterByACL']));
+			} else {
+				$o_browse = caGetBrowseInstance($this->table);
+		
+				if ($vs_query) {
+					$o_browse->addCriteria("_search", $vs_query);
+				}
 			
-			if ($this->opa_provider_info['setFacet'] && $set) {
-				$o_browse->addCriteria($this->opa_provider_info['setFacet'], $set);
+				if ($this->opa_provider_info['setFacet'] && $set) {
+					$o_browse->addCriteria($this->opa_provider_info['setFacet'], $set);
+				}
+				$o_browse->execute(array('showDeleted' => $vb_show_deleted, 'no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values, 'dontFilterByACL' => $this->opa_provider_info['dontFilterByACL']));
+				$qr_res = $o_browse->getResults();
 			}
-			$o_browse->execute(array('showDeleted' => $vb_show_deleted, 'no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values, 'dontFilterByACL' => $this->opa_provider_info['dontFilterByACL']));
-			$qr_res = $o_browse->getResults();
 		} else {
 			$qr_res = $o_search->search(strlen($this->opa_provider_info['query']) ? $this->opa_provider_info['query'] : "*", array('no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'showDeleted' => $vb_show_deleted, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values, 'dontFilterByACL' => $this->opa_provider_info['dontFilterByACL']));
 		}
