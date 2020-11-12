@@ -104,6 +104,7 @@
 		 */
 		public function addAttribute($pa_values, $pm_element_code_or_id, $ps_error_source=null, $pa_options=null) {
 			require_once(__CA_APP_DIR__.'/models/ca_metadata_elements.php');
+			if(!is_array($pa_options)) { $pa_options = []; }
 			if (!($t_element = ca_metadata_elements::getInstance($pm_element_code_or_id))) { return false; }
 			if ($t_element->get('parent_id') > 0) { return false; }
 			$vn_element_id = $t_element->getPrimaryKey();
@@ -144,15 +145,21 @@
 				}	// # attributes is at upper limit
 			}
 			
-			if (caGetOption('skipExistingValues', $pa_options, false)) {
-			    // filter out any values that already exist on this row
+			if (caGetOption('skipExistingValues', $pa_options, false) || !caGetOption('allowDuplicateValues', $element_info, false)) {
+				 // filter out any values that already exist on this row
 			    if(is_array($va_attrs = $this->getAttributesByElement($pm_element_code_or_id))) {
 			        $vb_already_exists = false;
 			        foreach($va_attrs as $o_attr) {
 			            foreach($o_attr->getValues() as $o_value) {
 			                $vn_element_id = $o_value->getElementID();
 			                $vs_element_code = ca_metadata_elements::getElementCodeForId($vn_element_id);
-			                if ($pa_values[$vs_element_code] && ($pa_values[$vs_element_code] != $o_value->getDisplayValue())) {
+			                
+			                $pv = $o_value->getDisplayValue();
+			                if (
+			                	(strlen($pa_values[$vn_element_id] && ($pa_values[$vn_element_id] != $pv)))
+			            		||
+			            		(strlen($pa_values[$vs_element_code] && ($pa_values[$vs_element_code] != $pv)))
+			            	) {
 			                    continue(2);
 			                }
 			            }
@@ -169,7 +176,7 @@
 				'values' => $pa_values,
 				'element' => $pm_element_code_or_id,
 				'error_source' => $ps_error_source,
-				'options' => $pa_options
+				'options' => array_merge($pa_options, ['skipExistingValues' => false])  // don't invoke low-level value skipping
 			);
 			$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_element_id] = true;
 			
@@ -201,33 +208,119 @@
 			if (!$t_attr->getPrimaryKey()) { return false; }
 			$vn_attr_element_id = $t_attr->get('element_id');
 			
-			$va_attr_values = $t_attr->getAttributeValues();
+			$element_info = ca_metadata_elements::getElementSettingsForId($pm_element_code_or_id);
 			
-			if (sizeof($va_attr_values) != (sizeof($pa_values) - 1)) {		// -1 to remove locale_id which is not in attribute values array
+			$va_attr_values = $t_attr->getAttributeValues();
+			$element = null;
+			
+			
+			$num_values = sizeof($pa_values);
+			if(array_key_exists('locale_id', $pa_values)) { $num_values--; }
+			
+			if (caGetOption('skipExistingValues', $pa_options, false) || !caGetOption('allowDuplicateValues', $element_info, false)) {
+			    // filter out any values that already exist on this row
+			    if(is_array($va_attrs = $this->getAttributesByElement($pm_element_code_or_id))) {
+			        $vb_already_exists = false;
+			        
+			        foreach($va_attrs as $o_attr) {
+			            if ($o_attr->getAttributeID() == $pn_attribute_id) { continue; }
+			            foreach($o_attr->getValues() as $o_value) {
+			                $vn_element_id = $o_value->getElementID();
+			                $vs_element_code = ca_metadata_elements::getElementCodeForId($vn_element_id);
+			                
+			                $pv = $o_value->getDisplayValue();
+			                if (
+			                	(
+			                		array_key_exists($vn_element_id, $pa_values)
+			                		&&
+			                		((strlen($pa_values[$vn_element_id] && ($pa_values[$vn_element_id] != $pv))) || !strlen($pa_values[$vn_element_id]))
+			                	)
+			            		||
+			            		(
+			            			array_key_exists($vs_element_code, $pa_values)
+			            			&&
+			            			((strlen($pa_values[$vs_element_code] && ($pa_values[$vs_element_code] != $pv))) || !strlen($pa_values[$vs_element_code]))
+			            		)
+			            	) {
+			                    continue(2);
+			                }
+			            }
+			            $vb_already_exists = true;
+			            break;
+			        }
+			        if ($vb_already_exists) {
+			            return null;
+			        }
+			    }
+			}
+			
+			if (
+			    // this may return a false positive if the attribute is a container with media or file attributes, 
+			    // as ca_attribute_values records for those will only be present if a file was uploaded
+			    (sizeof($va_attr_values) !== (sizeof($pa_values) - 1))      
+			    &&
+			    // so if it looks like it may be a mismatch we do another, more costly, element calcuation to be sure
+			    is_array($elements = array_filter(ca_metadata_elements::getElementsForSet($vn_attr_element_id, ['omitContainers' => true]), function($v) { return (int)$v['datatype'] !== 0; }))
+			    &&    
+			    (sizeof($elements) !== $num_values)
+			) {		// -1 to remove locale_id which is not in attribute values array
 				// Value arrays are different sizes - probably means the elements in the set have been reconfigured (sub-elements added or removed)
 				// so we need to force a save.
-				$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_attr_element_id] = true;
+		       $this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_attr_element_id] = true;
 			} else {
+				if(!$elements) { $elements = array_filter(ca_metadata_elements::getElementsForSet($vn_attr_element_id, ['omitContainers' => true]), function($v) { return (int)$v['datatype'] !== 0; }); }
+				
+				$element_codes = array_flip(array_map(function($v) { return $v['element_code']; }, $elements));
+				
 				// Have any of the values changed?
 				foreach($va_attr_values as $o_attr_value) {
 					$vn_element_id = $o_attr_value->getElementID();
 					$vs_element_code = ca_metadata_elements::getElementCodeForId($vn_element_id);
+					$vn_element_datatype = ca_metadata_elements::getElementDatatype($vn_element_id);
 					
+					unset($element_codes[$vs_element_code]);
 					if (
 						(
-							isset($pa_values[$vn_element_id]) && ($pa_values[$vn_element_id] !== $o_attr_value->getDisplayValue()) 
+							array_key_exists($vn_element_id, $pa_values) && ($pa_values[$vn_element_id] !== $o_attr_value->getDisplayValue()) 
 							&& 
 							!(($pa_values[$vn_element_id] == "") && (is_null($o_attr_value->getDisplayValue())))
+							&& 
+							!in_array($vn_element_datatype, [__CA_ATTRIBUTE_VALUE_MEDIA__, __CA_ATTRIBUTE_VALUE_FILE__])
 						)
 						||
 						(
-							isset($pa_values[$vs_element_code]) && ($pa_values[$vs_element_code] !== $o_attr_value->getDisplayValue()) 
+							array_key_exists($vs_element_code, $pa_values) && ($pa_values[$vs_element_code] !== $o_attr_value->getDisplayValue()) 
 							&&
 							!(($pa_values[$vs_element_code] == "") && (is_null($o_attr_value->getDisplayValue())))
+							&& 
+							!in_array($vn_element_datatype, [__CA_ATTRIBUTE_VALUE_MEDIA__, __CA_ATTRIBUTE_VALUE_FILE__])
+						)
+						||
+						(
+							in_array($vn_element_datatype, [__CA_ATTRIBUTE_VALUE_MEDIA__, __CA_ATTRIBUTE_VALUE_FILE__])
+							&& 
+							array_key_exists($vs_element_code, $pa_values) && is_array($pa_values[$vs_element_code]) && sizeof($pa_values[$vs_element_code])
+							
+						)
+						||
+						(
+							in_array($vn_element_datatype, [__CA_ATTRIBUTE_VALUE_MEDIA__, __CA_ATTRIBUTE_VALUE_FILE__])
+							&& 
+							array_key_exists($vn_element_id, $pa_values) && is_array($pa_values[$vn_element_id]) && sizeof($pa_values[$vn_element_id])
+							
 						)
 					) {
 						$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_attr_element_id] = true;
 						break;
+					}
+				}
+				
+				if(sizeof($element_codes) > 0) {
+					foreach($element_codes as $element_code => $element_id) {
+						if(isset($pa_values[$element_code]) && $pa_values[$element_code]) {
+							$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_attr_element_id] = true;
+							break;
+						}
 					}
 				}
 			}
@@ -268,17 +361,17 @@
 		 * Replaces first attribute value with specified values; will add attribute value if no attributes are defined 
 		 * This is handy for doing editing on non-repeating attributes
 		 */
-		public function replaceAttribute($pa_values, $pm_element_code_or_id, $ps_error_source=null) {
+		public function replaceAttribute($pa_values, $pm_element_code_or_id, $ps_error_source=null, $pa_options=null) {
 			$va_attrs = $this->getAttributesByElement($pm_element_code_or_id);
 			
-			if (sizeof($va_attrs)) {
+			if (is_array($va_attrs) && sizeof($va_attrs)) {
 				return $this->editAttribute(
 					$va_attrs[0]->getAttributeID(),
-					$pm_element_code_or_id, $pa_values, $ps_error_source
+					$pm_element_code_or_id, $pa_values, $ps_error_source, $pa_options
 				);
 			} else {
 				return $this->addAttribute(
-					$pa_values, $pm_element_code_or_id, $ps_error_source
+					$pa_values, $pm_element_code_or_id, $ps_error_source, $pa_options
 				);
 			}
 		}
@@ -307,7 +400,7 @@
 			}
 			if (!($t_element = ca_metadata_elements::getInstance($t_attr->get('element_id')))) { return false; }
 			
-			if ($vb_require_value = (bool)$t_element->getSetting('requireValue')) {
+			if (($vb_require_value = (bool)$t_element->getSetting('requireValue')) && (!isset($pa_options['dontCheckMinMax']))) {
 				$pa_options['dontCheckMinMax'] = false;
 			}
 			
@@ -341,6 +434,7 @@
 				'error_source' => $ps_error_source,
 				'element_id' => $t_attr->get('element_id')
 			);
+			
 			
 			$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$t_attr->get('element_id')] = true;
 			
