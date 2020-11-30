@@ -800,7 +800,15 @@ class ItemService extends BaseJSONService {
 						// use the default locale
 						$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 					}
-					$t_instance->addAttribute($va_value,$vs_attribute_name);
+
+					$valueSource = '';
+
+					if (isset($va_value['_value_source'])) {
+						$valueSource = $va_value['_value_source'];
+						unset($va_value['_value_source']);
+					}
+
+					$t_instance->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
 				}
 			}
 		}
