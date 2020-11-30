@@ -102,7 +102,7 @@
 		 *      
 		 * @return bool True on success, false on error or null if attribute was skipped.
 		 */
-		public function addAttribute($pa_values, $pm_element_code_or_id, $ps_error_source=null, $pa_options=null) {
+		public function addAttribute($pa_values, $pm_element_code_or_id, $ps_error_source=null, $pa_options=null, $valueSource=null) {
 			require_once(__CA_APP_DIR__.'/models/ca_metadata_elements.php');
 			if(!is_array($pa_options)) { $pa_options = []; }
 			if (!($t_element = ca_metadata_elements::getInstance($pm_element_code_or_id))) { return false; }
@@ -176,6 +176,7 @@
 				'values' => $pa_values,
 				'element' => $pm_element_code_or_id,
 				'error_source' => $ps_error_source,
+				'value_source' => $valueSource,
 				'options' => array_merge($pa_options, ['skipExistingValues' => false])  // don't invoke low-level value skipping
 			);
 			$this->_FIELD_VALUE_CHANGED['_ca_attribute_'.$vn_element_id] = true;
@@ -184,14 +185,15 @@
 		}
 		# ------------------------------------------------------------------
 		// create an attribute linked to the current row using values in $pa_values
-		public function _addAttribute($pa_values, $pm_element_code_or_id, $po_trans=null, $pa_info=null) {
+		// VHH - Added value source
+		public function _addAttribute($pa_values, $pm_element_code_or_id, $po_trans=null, $pa_info=null, $valueSource=null) {
 			if (!($t_element = ca_metadata_elements::getInstance($pm_element_code_or_id))) { return false; }
 			if ($t_element->get('parent_id') > 0) { return false; }
 			
 			$t_attr = new ca_attributes();
 			$t_attr->purify($this->purify());
 			if ($po_trans) { $t_attr->setTransaction($po_trans); }
-			$vn_attribute_id = $t_attr->addAttribute($this->tableNum(), $this->getPrimaryKey(), $t_element->getPrimaryKey(), $pa_values, $pa_info['options']);
+			$vn_attribute_id = $t_attr->addAttribute($this->tableNum(), $this->getPrimaryKey(), $t_element->getPrimaryKey(), $pa_values, $pa_info['options'], $valueSource);
 			if ($t_attr->numErrors()) {
 				foreach($t_attr->errors as $o_error) {
 					$this->postError($o_error->getErrorNumber(), $o_error->getErrorDescription(), $o_error->getErrorContext(), $pa_info['error_source']);
@@ -497,12 +499,17 @@
 			return $this->update(['queueIndexing' => true]);
 		}
 		# ------------------------------------------------------------------
+		# VHH - added value source
 		private function _commitAttributes($po_trans=null) {
 			$va_attribute_change_list = array();
 			$va_inserted_attributes_that_errored = array();
 			
 			foreach($this->opa_attributes_to_add as $va_info) {
-				if ((!($vn_attribute_id = $this->_addAttribute($va_info['values'], $va_info['element'], $po_trans, $va_info))) && !is_null($vn_attribute_id)) {
+				$valueSource = null;
+				if (isset($va_info['value_source'])) {
+					$valueSource = $va_info['value_source'];
+				}
+				if ((!($vn_attribute_id = $this->_addAttribute($va_info['values'], $va_info['element'], $po_trans, $va_info, $valueSource))) && !is_null($vn_attribute_id)) {
 					$va_info['values']['_errors'] = $this->_getErrorsForBundleUI($va_info['error_source']);
 					$va_inserted_attributes_that_errored[$va_info['element']][] = $va_info['values'];
 				} else {

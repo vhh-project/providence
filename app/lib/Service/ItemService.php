@@ -435,7 +435,7 @@ class ItemService extends BaseJSONService {
 						// CHANGES BY RONI -- START
 						// Adding the actual id of the attribute
 						// Adding the value_source field for the attribute
-						$t_attr = ca_attributes::getAttributeForValueID($vs_val_id);
+						$t_attr = new ca_attributes($vs_val_id);
 						$valueSource = (!empty($t_attr->_FIELD_VALUES) && !empty($t_attr->_FIELD_VALUES['value_source'])) ? $t_attr->_FIELD_VALUES['value_source'] : '';
 						$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code, '_id' => $vs_val_id, '_value_source' => $valueSource), $va_actual_data);
 						// CHANGES BY RONI -- END
@@ -1002,7 +1002,15 @@ class ItemService extends BaseJSONService {
 						// use the default locale
 						$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 					}
-					$t_instance->addAttribute($va_value,$vs_attribute_name);
+
+					$valueSource = '';
+
+					if (isset($va_value['_value_source'])) {
+						$valueSource = $va_value['_value_source'];
+						unset($va_value['_value_source']);
+					}
+
+					$t_instance->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
 				}
 			}
 		}
@@ -1014,6 +1022,11 @@ class ItemService extends BaseJSONService {
 					if (!empty($va_value['_id'])) {
 						$vs_attribute_id = $va_value['_id'];
 						unset($va_value['_id']);
+
+						if (isset($va_value['_value_source'])) {
+							$o_db = new Db();
+							$o_db->query("UPDATE ca_attributes SET value_source=\"".$va_value['_value_source']."\" WHERE attribute_id = ".$vs_attribute_id, []);
+						}
 
 						if($va_value["locale"]) {
 							$va_value["locale_id"] = $t_locales->localeCodeToID($va_value["locale"]);

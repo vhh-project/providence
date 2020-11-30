@@ -229,9 +229,9 @@ class ca_attributes extends BaseModel {
 	}
 	# -------------------------------------------------------
 	/**
-	 *
+	 * VHH: Added value source
 	 */
-	public function addAttribute($pn_table_num, $pn_row_id, $pm_element_code_or_id, $pa_values, $pa_options=null) {
+	public function addAttribute($pn_table_num, $pn_row_id, $pm_element_code_or_id, $pa_values, $pa_options=null, $valueSource=null) {
 	    if (!is_array($pa_options)) { $pa_options = []; }
 		require_once(__CA_MODELS_DIR__.'/ca_metadata_elements.php');	// defer inclusion until runtime to ensure baseclasses are already loaded, otherwise you get circular dependencies
 		
@@ -259,6 +259,7 @@ class ca_attributes extends BaseModel {
 		// TODO: verify table_num/row_id combo
 		$this->set('table_num', $pn_table_num);
 		$this->set('row_id', $pn_row_id);
+		$this->set('value_source', $valueSource);
 		
 		$this->setMode(ACCESS_WRITE);
 		$this->insert($pa_options);
