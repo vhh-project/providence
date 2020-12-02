@@ -813,6 +813,15 @@ class ItemService extends BaseJSONService {
 			}
 		}
 
+		// VHH - add autogeneration of idno
+		if (!empty($_GET["forceidno"]) && $_GET["forceidno"] === '1') {
+			$o_numbering_plugin = $t_instance->getIDNoPlugInInstance();
+			if (!($vs_sep = $o_numbering_plugin->getSeparator())) { $vs_sep = ''; }
+			if (!is_array($va_idno_values = $o_numbering_plugin->htmlFormValuesAsArray('idno', null, false, false, true))) { $va_idno_values = array(); }
+			$vs_idno_value = join($vs_sep, $va_idno_values);
+			$t_instance->set('idno', $vs_idno_value);
+		}
+
 		$t_instance->setMode(ACCESS_WRITE);
 		$t_instance->insert();
 
