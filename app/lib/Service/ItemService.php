@@ -347,6 +347,13 @@ class ItemService extends BaseJSONService {
 
 		$va_return = array();
 
+		// VHH: Added $va_versions in order to get the URL of the original media file in this JSON view
+		$o_service_config = Configuration::load(__CA_APP_DIR__."/conf/services.conf");
+		$va_versions = $o_service_config->get('item_service_media_versions');
+		if(!is_array($va_versions) || !sizeof($va_versions)) {
+			$va_versions = ['preview170','original'];
+		}
+
 		// allow user-defined template to be passed; allows flexible formatting of returned "display" value
 		if (!($vs_template = $this->opo_request->getParameter('template', pString))) { $vs_template = ''; }
 		if ($vs_template) {
@@ -403,8 +410,9 @@ class ItemService extends BaseJSONService {
 		}
 
 		// representations for representable stuff
+		// VHH: Added $va_versions in order to show the path of the  original media
 		if($t_instance instanceof RepresentableBaseModel) {
-			$va_reps = $t_instance->getRepresentations();
+			$va_reps = $t_instance->getRepresentations($va_versions);
 			if(is_array($va_reps) && (sizeof($va_reps)>0)) {
 				$va_return['representations'] = caSanitizeArray($va_reps, ['removeNonCharacterData' => true]);
 			}
@@ -419,11 +427,30 @@ class ItemService extends BaseJSONService {
 		}
 
 		// attributes
+		// VHH CHANGES - added an option in order to get both - ids and labels for entities, lists, etc.
 		$va_codes = $t_instance->getApplicableElementCodes();
 		foreach($va_codes as $vs_code) {
 			if($va_vals = $t_instance->get($this->ops_table.".".$vs_code,
 				array("returnWithStructure" => true, "returnAllLocales" => true, "convertCodesToDisplayText" => false))
 			 ){
+				if (!empty($_GET["showdisplaytext"]) && $_GET["showdisplaytext"] === '1') {
+					$va_display_vals_original = $t_instance->get($this->ops_table.".".$vs_code,
+						array("returnWithStructure" => true, "returnAllLocales" => true, "convertCodesToDisplayText" => true));
+					$va_display_vals_ordered = array();
+					$va_display_vals_original_locale = end($va_display_vals_original);
+					foreach($va_display_vals_original_locale as $vn_locale_id => $va_locale_vals) {
+						foreach($va_locale_vals as $vs_val_id => $va_actual_data) {
+							if(!is_array($va_actual_data)) {
+								continue;
+							}
+							$vs_locale_code = isset($va_locales[$vn_locale_id]["code"]) ? $va_locales[$vn_locale_id]["code"] : "none";
+							if (!isset($va_display_vals_ordered[$vs_val_id])) {
+								$va_display_vals_ordered[$vs_val_id] = array();
+							}
+							$va_display_vals_ordered[$vs_val_id][$vs_locale_code] = $va_actual_data;
+						}
+					}
+				}
 				$va_vals_by_locale = end($va_vals); // I seriously have no idea what that additional level of nesting in the return format is for
 				foreach($va_vals_by_locale as $vn_locale_id => $va_locale_vals) {
 					foreach($va_locale_vals as $vs_val_id => $va_actual_data) {
@@ -432,13 +459,30 @@ class ItemService extends BaseJSONService {
 						}
 						$vs_locale_code = isset($va_locales[$vn_locale_id]["code"]) ? $va_locales[$vn_locale_id]["code"] : "none";
 
-						// CHANGES BY RONI -- START
+						// VHH CHANGES
 						// Adding the actual id of the attribute
 						// Adding the value_source field for the attribute
 						$t_attr = new ca_attributes($vs_val_id);
 						$valueSource = (!empty($t_attr->_FIELD_VALUES) && !empty($t_attr->_FIELD_VALUES['value_source'])) ? $t_attr->_FIELD_VALUES['value_source'] : '';
-						$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code, '_id' => $vs_val_id, '_value_source' => $valueSource), $va_actual_data);
-						// CHANGES BY RONI -- END
+
+						if (isset($va_display_vals_ordered)) {
+							if (isset($va_display_vals_ordered[$vs_val_id]) && isset($va_display_vals_ordered[$vs_val_id][$vs_locale_code])) {
+								$va_display_data = $va_display_vals_ordered[$vs_val_id][$vs_locale_code];
+							} else {
+								$va_display_data = array();
+							}
+
+							$va_final_data = array();
+
+							foreach ($va_actual_data as $attr_key => $attr_value) {
+								$va_display_value = (isset($va_display_data[$attr_key])) ? $va_display_data[$attr_key] : null;
+								$va_final_data[$attr_key] = array('data' => $attr_value, 'label' => $va_display_value);
+							}
+							$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code, '_id' => $vs_val_id, '_value_source' => $valueSource), $va_final_data);
+						} else {
+							$va_return['attributes'][$vs_code][] = array_merge(array('locale' => $vs_locale_code, '_id' => $vs_val_id, '_value_source' => $valueSource), $va_actual_data);
+						}
+						// VHH CHANGES -- END
 					}
 
 				}
@@ -993,7 +1037,7 @@ class ItemService extends BaseJSONService {
 			}
 		}
 
-		// CHANGES RONI - START
+		// VHH CHANGES - START
 		if(is_array($va_post["remove_attributes_by_id"])) {
 			foreach($va_post["remove_attributes_by_id"] as $vs_id_to_delete) {
 				$t_instance->removeAttribute($vs_id_to_delete);
@@ -1001,7 +1045,7 @@ class ItemService extends BaseJSONService {
 		}
 		// attributes
 		else if(is_array($va_post["remove_attributes"])) {
-		// CHANGES RONI - END
+		// VHH CHANGES - END
 			foreach($va_post["remove_attributes"] as $vs_code_to_delete) {
 				$t_instance->removeAttributes($vs_code_to_delete);
 			}
@@ -1032,7 +1076,7 @@ class ItemService extends BaseJSONService {
 			}
 		}
 
-		// CHANGES RONI - START
+		// VHH CHANGES - START
 		if(is_array($va_post["update_attributes"]) && sizeof($va_post["update_attributes"])) {
 			foreach($va_post["update_attributes"] as $vs_attribute_name => $va_values) {
 				foreach($va_values as $va_value) {
@@ -1058,7 +1102,7 @@ class ItemService extends BaseJSONService {
 				}
 			}
 		}
-		// CHANGES RONI - END
+		// VHH CHANGES - END
 
 		$t_instance->setMode(ACCESS_WRITE);
 		$t_instance->update();
