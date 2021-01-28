@@ -503,9 +503,7 @@ class ItemService extends BaseJSONService {
 			if($this->ops_table == "ca_sets" && $vs_rel_table=="ca_tours") { // throw SQL error in getRelatedItems
 				continue;
 			}
-
 			$va_related_items = $t_instance->get($vs_get_spec, array("returnWithStructure" => true));
-
 			if(is_array($va_related_items) && sizeof($va_related_items)>0) {
 				// most of the fields are usually empty because they are not supported on UI level
 				foreach($va_related_items as $va_rel_item) {
@@ -523,6 +521,58 @@ class ItemService extends BaseJSONService {
 							}
 						}
 					}
+
+					// VHH: Add interstitial attributes to relations
+
+					if (!empty($va_item_add['relation_id'])) {
+						$vs_rel_table_name = null;
+
+						if ($this->ops_table == 'ca_objects') {
+							if ($vs_rel_table == 'ca_objects') {
+								$vs_rel_table_name = 'ca_objects_x_objects';
+							}
+							else if ($vs_rel_table == 'ca_entities') {
+								$vs_rel_table_name = 'ca_objects_x_entities';
+							}
+						} else if ($this->ops_table == 'ca_entities') {
+							if ($vs_rel_table == 'ca_objects') {
+								$vs_rel_table_name = 'ca_objects_x_entities';
+							}
+							else if ($vs_rel_table == 'ca_entities') {
+								$vs_rel_table_name = 'ca_entities_x_entities';
+							}
+						}
+
+						if (isset($vs_rel_table_name)) {
+							if (($t_subject = Datamodel::getInstanceByTableName($vs_rel_table_name))) {
+								$t_subject->load($va_item_add['relation_id']);
+								$t_subject->reloadLabelDefinitions();
+								$va_codes = $t_subject->getApplicableElementCodes();
+									foreach($va_codes as $vs_code) {
+										if($va_vals = $t_subject->get($vs_rel_table_name.".".$vs_code,
+											array("returnWithStructure" => true, "returnAllLocales" => true, "convertCodesToDisplayText" => false))
+										 ) {
+											if (!empty($va_vals)) {
+												$attrList = array();
+												$va_vals = end($va_vals);
+												$va_vals = end($va_vals);
+												foreach($va_vals as $attrId => $attrs) {
+													$attrs['_id'] = $attrId;
+													$attrList[] = $attrs;
+												}
+
+												if (!isset($va_item_add['attributes'])) {
+													$va_item_add['attributes'] = array();
+												}
+
+												$va_item_add['attributes'][$vs_code] = $attrList;
+											}
+										}
+									}
+								}
+							}
+					}
+
 					$va_return["related"][$vs_rel_table][] = $va_item_add;
 				}
 			}
@@ -1160,6 +1210,16 @@ class ItemService extends BaseJSONService {
 				$t_instance->removeRelationships($vs_table);
 			}
 		}
+
+    // VHH - START
+		if($va_post["remove_relationships_by_id"]) {
+			foreach($va_post["remove_relationships_by_id"] as $vs_table => $va_type_ids) {
+				foreach($va_type_ids as $vs_type_id) {
+					$t_instance->removeRelationship($vs_table, intval($vs_type_id));
+				}
+			}
+		}
+    // VHH - END
 
 		if(is_array($va_post["related"]) && sizeof($va_post["related"])>0) {
 			foreach($va_post["related"] as $vs_table => $va_relationships) {
