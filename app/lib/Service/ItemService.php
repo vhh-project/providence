@@ -557,7 +557,10 @@ class ItemService extends BaseJSONService {
 												$va_vals = end($va_vals);
 												$va_vals = end($va_vals);
 												foreach($va_vals as $attrId => $attrs) {
+													$t_attr = new ca_attributes($attrId);
+													$valueSource = (!empty($t_attr->_FIELD_VALUES) && !empty($t_attr->_FIELD_VALUES['value_source'])) ? $t_attr->_FIELD_VALUES['value_source'] : '';
 													$attrs['_id'] = $attrId;
+													$attrs['_value_source'] = $valueSource;
 													$attrList[] = $attrs;
 												}
 
@@ -1002,7 +1005,18 @@ class ItemService extends BaseJSONService {
 											// use the default locale
 											$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 										}
-										$t_rel->addAttribute($va_value,$vs_attribute_name);
+										// VHH CHANGES - START
+										// Added value source to interstitial records
+										$valueSource = '';
+
+										if (isset($va_value['_value_source'])) {
+											$valueSource = $va_value['_value_source'];
+											unset($va_value['_value_source']);
+										}
+
+										$t_rel->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+										// VHH CHANGES - END
+
 										$vb_have_to_update = true;
 									}
 								}
@@ -1249,7 +1263,18 @@ class ItemService extends BaseJSONService {
 										// use the default locale
 										$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 									}
-									$t_rel->addAttribute($va_value,$vs_attribute_name);
+									// VHH CHANGES - START
+									// Added value source to interstitial records
+									$valueSource = '';
+
+									if (isset($va_value['_value_source'])) {
+										$valueSource = $va_value['_value_source'];
+										unset($va_value['_value_source']);
+									}
+
+									$t_rel->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+									// VHH CHANGES - END
+
 									$vb_have_to_update = true;
 								}
 							}
