@@ -44,10 +44,20 @@ class ItemService extends BaseJSONService {
 	}
 	# -------------------------------------------------------
 	public function dispatch() {
+		if ($this->getRequestMethod() == 'POST') {
+			if ($this->opo_request->getParameter("uploadthumb", pString) == '1') {
+				return $this->uploadThumb();
+			} else {
+				return $this->deleteThumb();
+			}
+		}
+
 		switch($this->getRequestMethod()) {
 			case "GET":
 			case "POST":
-				if(strlen($this->opn_id) > 0) {	// we allow that this might be a string here for idno-based fetching
+				if ($this->opo_request->getParameter("lookup", pString) == '1') {
+					return $this->getLookup();
+				} else if(strlen($this->opn_id) > 0) {	// we allow that this might be a string here for idno-based fetching
 					if(sizeof($this->getRequestBodyArray())==0) {
 						// allow different format specifications
 						if($vs_format = $this->opo_request->getParameter("format", pString)) {
@@ -95,6 +105,68 @@ class ItemService extends BaseJSONService {
 				$this->addError(_t("Invalid HTTP request method"));
 				return false;
 		}
+	}
+  # -------------------------------------------------------
+	protected function getLookup() {
+		$ps_query = $this->opo_request->getParameter('term', pString);
+		$ps_bundle = $this->opo_request->getParameter('bundle', pString);
+
+		$va_tmp = explode('.', $ps_bundle);
+		
+		if (!($t_table = Datamodel::getInstanceByTableName($va_tmp[0], true))) {
+			// bad table name
+			$this->addError(_t("Invalid table name"));
+			return null;
+		}
+
+		$t_element = new ca_metadata_elements();
+		if (!($t_element->load(array('element_code' => $va_tmp[1])))) {
+			$this->addError(_t("Invalid element code"));
+			return null;
+		}
+		
+		if ((int)$t_element->getSetting('suggestExistingValues') !== 1) {
+			$this->addError(_t("Value suggestion is not supported for this metadata element"));
+			return null;
+		}
+		
+		if ($this->opo_request->user->getBundleAccessLevel($va_tmp[0], $va_tmp[1]) == __CA_BUNDLE_ACCESS_NONE__) {
+			$this->addError(_t("You do not have access to this bundle"));
+			return null;
+		}
+		
+		$va_type_restrictions = $t_element->getTypeRestrictions($t_table->tableNum());
+		if (!$va_type_restrictions || !is_array($va_type_restrictions) || !sizeof($va_type_restrictions)) {
+			$this->addError(_t("Element code is not bound to the specified table"));
+			return null;
+		}
+		
+		$o_db = new Db();
+		
+		switch($t_element->getSetting('suggestExistingValueSort')) {
+			case 'recent':		// date/time entered
+				$vs_sort_field = 'value_id DESC';
+				$vn_max_returned_values = 10;
+				break;
+			default:				// alphabetically
+				$vs_sort_field = 'value_longtext1 ASC';
+				$vn_max_returned_values = 25;
+				break;
+		}
+		
+		$qr_res = $o_db->query("
+			SELECT DISTINCT value_longtext1
+			FROM ca_attribute_values
+			WHERE
+				element_id = ?
+				AND
+				(value_longtext1 LIKE ?)
+			ORDER BY
+				{$vs_sort_field}
+			LIMIT {$vn_max_returned_values}
+		", (int)$t_element->getPrimaryKey(), (string)$ps_query.'%');
+		
+		return array('response' => $qr_res->getAllFieldValues('value_longtext1'));
 	}
 	# -------------------------------------------------------
 	protected function getSpecificItemInfo() {
@@ -557,7 +629,10 @@ class ItemService extends BaseJSONService {
 												$va_vals = end($va_vals);
 												$va_vals = end($va_vals);
 												foreach($va_vals as $attrId => $attrs) {
+													$t_attr = new ca_attributes($attrId);
+													$valueSource = (!empty($t_attr->_FIELD_VALUES) && !empty($t_attr->_FIELD_VALUES['value_source'])) ? $t_attr->_FIELD_VALUES['value_source'] : '';
 													$attrs['_id'] = $attrId;
+													$attrs['_value_source'] = $valueSource;
 													$attrList[] = $attrs;
 												}
 
@@ -1002,7 +1077,18 @@ class ItemService extends BaseJSONService {
 											// use the default locale
 											$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 										}
-										$t_rel->addAttribute($va_value,$vs_attribute_name);
+										// VHH CHANGES - START
+										// Added value source to interstitial records
+										$valueSource = '';
+
+										if (isset($va_value['_value_source'])) {
+											$valueSource = $va_value['_value_source'];
+											unset($va_value['_value_source']);
+										}
+
+										$t_rel->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+										// VHH CHANGES - END
+
 										$vb_have_to_update = true;
 									}
 								}
@@ -1069,6 +1155,86 @@ class ItemService extends BaseJSONService {
 		} else {
 			return array($t_instance->primaryKey() => $t_instance->getPrimaryKey());
 		}
+	}
+	# -------------------------------------------------------
+  private function uploadThumb($ps_table=null) {
+		if(!$ps_table) { $ps_table = $this->ops_table; }
+		
+		if(!($t_instance = $this->_getTableInstance($this->ops_table,$this->opn_id))) {
+			$this->addError('instance_not_found');
+			return false;
+		}
+
+		// Check if file data is present
+		if (empty($_FILES) || empty($_FILES['thumb']) || empty($_FILES['thumb']['tmp_name'])) {
+			$this->addError('missing_file_data');
+			return false;
+		}
+		
+		// Create new primary Representation
+		$t_instance->addRepresentation(
+			$_FILES['thumb']['tmp_name'],
+			caGetOption('type', $va_rep, 'front'), // this might be retarded but most people don't change the representation type list
+			ca_locales::getDefaultCataloguingLocaleID(),
+			0,				// Status
+			1,				// Access Status
+			true,			// Primary
+			null,			// values
+			array('original_filename' => $_FILES['thumb']['name']) // options
+		);
+
+		if($t_instance->numErrors()>0) {
+			foreach($t_instance->getErrors() as $vs_error) {
+				$this->addError($vs_error);
+			}
+			return false;
+		}
+
+		$va_removed_ids = array();
+		$va_new_info = array();
+
+		$o_service_config = Configuration::load(__CA_APP_DIR__."/conf/services.conf");
+		$va_versions = $o_service_config->get('item_service_media_versions');
+		if(!is_array($va_versions) || !sizeof($va_versions)) {
+			$va_versions = ['preview170','original'];
+		}
+
+		// Add info on primary representation and delete all other representations that are not primary
+		if (is_array($va_reps = $t_instance->getRepresentations($va_versions))) {
+			foreach ($va_reps as $vn_i => $va_rep_info) {
+				if ($va_rep_info['is_primary'] == '1') {
+					$va_new_info = $va_rep_info;
+				} else {
+					$t_instance->removeRepresentation($va_rep_info['representation_id']);
+					$va_removed_ids[] = $va_rep_info['representation_id'];
+				}
+			}
+		}
+		
+		return array('new_representation' => $va_new_info, 'removed_ids' => $va_removed_ids);
+	}
+	# -------------------------------------------------------
+  private function deleteThumb($ps_table=null) {
+		if(!$ps_table) { $ps_table = $this->ops_table; }
+		
+		if(!($t_instance = $this->_getTableInstance($this->ops_table,$this->opn_id))) {
+			$this->addError('instance_not_found');
+			return false;
+		}
+
+		$vs_removed_id = '';
+
+		// Add info on primary representation and delete all other representations that are not primary
+		if (is_array($va_reps = $t_instance->getRepresentations($va_versions))) {
+			foreach ($va_reps as $vn_i => $va_rep_info) {
+				if ($va_rep_info['is_primary'] == '1') {
+					$vs_removed_id = $va_rep_info['representation_id'];
+					$t_instance->removeRepresentation($va_rep_info['representation_id']);
+				}
+			}
+		}
+		
+		return array('removed_id' => $vs_removed_id);
 	}
 	# -------------------------------------------------------
 	private function editItem($ps_table=null) {
@@ -1249,7 +1415,18 @@ class ItemService extends BaseJSONService {
 										// use the default locale
 										$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
 									}
-									$t_rel->addAttribute($va_value,$vs_attribute_name);
+									// VHH CHANGES - START
+									// Added value source to interstitial records
+									$valueSource = '';
+
+									if (isset($va_value['_value_source'])) {
+										$valueSource = $va_value['_value_source'];
+										unset($va_value['_value_source']);
+									}
+
+									$t_rel->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+									// VHH CHANGES - END
+
 									$vb_have_to_update = true;
 								}
 							}

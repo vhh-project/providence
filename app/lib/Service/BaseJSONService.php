@@ -75,17 +75,21 @@ class BaseJSONService {
 				$this->opo_request->reloadAppConfig();
 			}
 		}
-
-		$vs_post_data = $this->opo_request->getRawPostData();
-		if(strlen(trim($vs_post_data))>0){
-			$this->opa_post = json_decode($vs_post_data,true);
-			if(!is_array($this->opa_post)){
-				$this->addError(_t("Data sent via POST doesn't seem to be in JSON format"));
-			}
-		} else if($vs_post_data = $this->opo_request->getParameter('source', pString)) {
-			$this->opa_post = json_decode($vs_post_data, true);
-			if(!is_array($this->opa_post)){
-				$this->addError(_t("Data sent via 'source' parameter doesn't seem to be in JSON format"));
+		
+		if ($this->opo_request->getParameter("uploadthumb", pString) != '1') {
+			$vs_post_data = $this->opo_request->getRawPostData();
+			if(strlen(trim($vs_post_data))>0){
+				$this->opa_post = json_decode($vs_post_data,true);
+				if(!is_array($this->opa_post)){
+					$this->addError(_t("Data sent via POST doesn't seem to be in JSON format"));
+				}
+			} else if($vs_post_data = $this->opo_request->getParameter('source', pString)) {
+				$this->opa_post = json_decode($vs_post_data, true);
+				if(!is_array($this->opa_post)){
+					$this->addError(_t("Data sent via 'source' parameter doesn't seem to be in JSON format"));
+				}
+			} else {
+				$this->opa_post = array();
 			}
 		} else {
 			$this->opa_post = array();
