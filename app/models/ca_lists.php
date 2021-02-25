@@ -1662,6 +1662,13 @@ class ca_lists extends BundlableLabelableBaseModelWithAttributes {
 				}
 				
 				if (is_array($omit_map)) {
+					$v = array_shift(caExtractValuesByUserLocale(caGetListItemForValue('access_statuses', $pa_options['value'])));
+					$value_idno = $v['idno'];
+					$default_value = caGetOption('default', $omit_map, null);
+					if(is_array($omit_map['omit'])) { $omit_map = $omit_map['omit']; }
+					if (in_array($value_idno, $omit_map, true)) {
+						$pa_options['value']= caGetListItemValueForIdno('access_statuses', $default_value);
+					}
 					foreach($omit_map as $i => $value) {
 						if(!strlen(trim($value))) { continue; }
 						if (!is_numeric($value)) { 
@@ -1679,7 +1686,10 @@ class ca_lists extends BundlableLabelableBaseModelWithAttributes {
 			case 'radio_buttons':
 				if (!sizeof($va_options)) { return ''; }	// return empty string if list has no values
 				$vn_i = 0;
-				$vs_buf = ($max_columns > 1) ? "<div style=\"column-count: {$max_columns};\">\n" : "<div>\n";
+				
+				$p = floor(100/$max_columns);
+				$vs_buf = ($max_columns > 1) ? "<div class='checklist' style='grid-template-columns: ".str_repeat(" {$p}%", $max_columns).";'>\n" : "<div>\n";
+	
 				foreach($va_options as $vm_value => $vs_label) {
 					
 					$va_attributes = array('value' => $vm_value);
@@ -1695,7 +1705,7 @@ class ca_lists extends BundlableLabelableBaseModelWithAttributes {
 					if (isset($pa_options['readonly']) && ($pa_options['readonly'])) {
 						$va_attributes['disabled'] = 1;
 					}
-					$vs_buf .= caHTMLRadioButtonInput($ps_name, $va_attributes, $pa_options)." {$vs_label}<br/>\n";
+					$vs_buf .=  "<div class='checklistItem'>".caHTMLRadioButtonInput($ps_name, $va_attributes, $pa_options)." {$vs_label}</div>\n";
 					
 					$vn_i++;
 				}
@@ -1737,7 +1747,10 @@ class ca_lists extends BundlableLabelableBaseModelWithAttributes {
 				break;
 			case 'checklist':
 				if (!sizeof($va_options)) { return ''; }	// return empty string if list has no values
-				$vs_buf = ($max_columns > 1) ? "<div style=\"column-count: {$max_columns};\">\n" : "<div>\n";
+				
+				$p = floor(100/$max_columns);
+				$vs_buf = ($max_columns > 1) ? "<div class='checklist' style='grid-template-columns: ".str_repeat(" {$p}%", $max_columns).";'>\n" : "<div>\n";
+			
 				foreach($va_options as $vm_value => $vs_label) {
 					$va_attributes = array('value' => $vm_value);
 					if (isset($va_disabled_options[$vm_value]) && $va_disabled_options[$vm_value]) {
@@ -1750,8 +1763,7 @@ class ca_lists extends BundlableLabelableBaseModelWithAttributes {
 						$va_attributes['checked'] = '1';
 					}
 					
-					$vs_buf .= caHTMLCheckboxInput($ps_name.'_'.$vm_value, $va_attributes, $pa_options)." {$vs_label}<br/>\n";
-					
+					$vs_buf .= "<div class='checklistItem'>".caHTMLCheckboxInput($ps_name.'_'.$vm_value, $va_attributes, $pa_options)." ".str_replace('&nbsp;', '', $vs_label)."</div>\n";				
 				}
 				$vs_buf .= "</div>";
 				return $vs_buf;

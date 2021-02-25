@@ -886,8 +886,9 @@ class BundlableLabelableBaseModelWithAttributes extends LabelableBaseModelWithAt
 	public function checkForDupeLabel($pn_locale_id, $pa_label_values, $pb_preferred_only=true) {
 		$o_db = $this->getDb();
 		$t_label = $this->getLabelTableInstance();
-		//unset($pa_label_values['displayname']);
-		$va_wheres = array();
+		if(!empty($pa_label_values['surname']) || !empty($pa_label_values['forename'])) { unset($pa_label_values['displayname']); }
+		
+		$va_wheres = [];
 		foreach($pa_label_values as $vs_field => $vs_value) {
 			$va_wheres[] = "(l.{$vs_field} = ?)";
 		}
@@ -904,10 +905,13 @@ class BundlableLabelableBaseModelWithAttributes extends LabelableBaseModelWithAt
 			$va_wheres[] = "(l.".$this->primaryKey()." <> ?)";
 		}
 		$vs_sql = "SELECT ".$t_label->primaryKey()."
-	 	FROM ".$t_label->tableName()." l
-	 	INNER JOIN ".$this->tableName()." AS t ON t.".$this->primaryKey()." = l.".$this->primaryKey()."
-	 	WHERE ".join(' AND ', $va_wheres);
-		$va_values = array_values($pa_label_values);
+			FROM ".$t_label->tableName()." l
+			INNER JOIN ".$this->tableName()." AS t ON t.".$this->primaryKey()." = l.".$this->primaryKey()."
+			WHERE ".join(' AND ', $va_wheres);
+			
+		// normalize nulls to blanks for comparison purposes
+		$va_values = array_map(function($v) { return is_null($v) ? '' : $v; }, array_values($pa_label_values));	
+		
 		if($pn_locale_id && $t_label->hasField('locale_id')) {
 			$va_values[] = (int)$pn_locale_id;
 		}
@@ -1825,12 +1829,12 @@ class BundlableLabelableBaseModelWithAttributes extends LabelableBaseModelWithAt
 						
 						break;
 					# -------------------------------
-					// This bundle is only available for objects
-					case 'ca_objects_deaccession':		// object deaccession information
+					// This bundle is available for objects, object lots and collections
+					case 'ca_objects_deaccession':		// deaccession information
 						if (!$vb_batch && !$this->getPrimaryKey()) { return null; }	// not supported for new records
 						if (!$pa_options['request']->user->canDoAction('can_edit_ca_objects')) { break; }
 					
-						$vs_element .= $this->getObjectDeaccessionHTMLFormBundle($pa_options['request'], $pa_options['formName'], $ps_placement_code, $pa_bundle_settings, $pa_options);
+						$vs_element .= $this->getDeaccessionHTMLFormBundle($pa_options['request'], $pa_options['formName'], $ps_placement_code, $pa_bundle_settings, $pa_options);
 						
 						break;
 					# -------------------------------
@@ -3080,8 +3084,8 @@ class BundlableLabelableBaseModelWithAttributes extends LabelableBaseModelWithAt
 		$o_view->setVar('bundle_name', $ps_related_table);
 		
 		
-		$o_view->setVar('sort', caGetOption('sort', $pa_options, null));
-		$o_view->setVar('sortDirection', caGetOption('sortDirection', $pa_options, null));
+		$o_view->setVar('sort', caGetOption('sort', $pa_options, caGetOption('sort', $pa_bundle_settings, null)));
+		$o_view->setVar('sortDirection', caGetOption('sortDirection', $pa_options, caGetOption('sortDirection', $pa_bundle_settings, null)));
 		
 		$o_view->setVar('ui', caGetOption('ui', $pa_options, null));
 		$o_view->setVar('screen', caGetOption('screen', $pa_options, null));
@@ -3699,7 +3703,7 @@ if (!$vb_batch) {
 							$vn_element_id = $va_element_info['element_id'];
 							
 							$vs_k = $vs_placement_code.$vs_form_prefix.'_attribute_'.$vn_element_set_id.'_'.$vn_element_id.'_'.$vn_attribute_id;
-							if(is_null($po_request->parameterExists($vs_k))) { continue; }
+							if(is_null($po_request->parameterExists($vs_k)) && !isset($_FILES[$vs_k])) { continue; }
 							$vs_attr_val = $po_request->getParameter($vs_k, pString);
 							if (isset($_FILES[$vs_k]) && ($va_val = $_FILES[$vs_k])) {
 								if ($va_val['size'] > 0) {	// is there actually a file?
@@ -3859,7 +3863,7 @@ if (!$vb_batch) {
 								$vn_label_type_id = $po_request->getParameter($vs_placement_code.$vs_form_prefix.'_Pref'.'type_id_'.$va_label['label_id'], pInteger);
 								if(is_array($va_label_values = $this->getLabelUIValuesFromRequest($po_request, $vs_placement_code.$vs_form_prefix, $va_label['label_id'], true))) {
 									if ($vb_check_for_dupe_labels && $this->checkForDupeLabel($vn_label_locale_id, $va_label_values)) {
-										$this->postError(1125, _t('Value <em>%1</em> is already used and duplicates are not allowed', join("/", $va_label_values)), "BundlableLabelableBaseModelWithAttributes->saveBundlesForScreen()", $this->tableName().'.preferred_labels');
+										$this->postError(1125, _t('Value <em>%1</em> is already used and duplicates are not allowed', join('', array_map(function($v) { return "<code>{$v}</code>"; }, array_filter($va_label_values, function($v) { return (bool)strlen($v); })))), "BundlableLabelableBaseModelWithAttributes->saveBundlesForScreen()", $this->tableName().'.preferred_labels');
 										$po_request->addActionErrors($this->errors(), 'preferred_labels');
 										continue;
 									}
@@ -3884,7 +3888,7 @@ if (!$vb_batch) {
 									}
 								} else {
 									$this->editLabel($va_label['label_id'],
-										array($this->getLabelDisplayField() => '['.caGetBlankLabelText().']'),
+										array($this->getLabelDisplayField() => '['.caGetBlankLabelText($table).']'),
 										$vn_label_locale_id,
 										$vn_label_type_id,
 										true, array('queueIndexing' => true)
@@ -3934,7 +3938,7 @@ if (!$vb_batch) {
 									foreach($va_labels_for_this_locale as $vn_id => $va_labels_by_locale) {
 						 				foreach($va_labels_by_locale as $vn_locale_id => $va_labels) {
 						 					foreach($va_labels as $vn_i => $va_label) {
-						 						if(isset($va_label[$this->getLabelDisplayField()]) && ($va_label[$this->getLabelDisplayField()] == '['.caGetBlankLabelText().']')) {
+						 						if(isset($va_label[$this->getLabelDisplayField()]) && ($va_label[$this->getLabelDisplayField()] == '['.caGetBlankLabelText($table).']')) {
 						 							$this->removeLabel($va_label['label_id'], array('queueIndexing' => true));
 						 						}
 						 					}
@@ -3953,7 +3957,7 @@ if (!$vb_batch) {
 							}
 							
 							if ($vb_check_for_dupe_labels && $this->checkForDupeLabel($vn_new_label_locale_id, $va_label_values)) {
-								$this->postError(1125, _t('Value <em>%1</em> is already used and duplicates are not allowed', join("/", $va_label_values)), "BundlableLabelableBaseModelWithAttributes->saveBundlesForScreen()", $this->tableName().'.preferred_labels');
+								$this->postError(1125, _t('Value <em>%1</em> is already used and duplicates are not allowed', join('', array_map(function($v) { return "<code>{$v}</code>"; }, array_filter($va_label_values, function($v) { return (bool)strlen($v); })))), "BundlableLabelableBaseModelWithAttributes->saveBundlesForScreen()", $this->tableName().'.preferred_labels');
 								$po_request->addActionErrors($this->errors(), 'preferred_labels');
 								$vb_error_inserting_pref_label = true;
 								continue;
@@ -4025,7 +4029,7 @@ if (!$vb_batch) {
 									}
 								} else {
 									$this->editLabel($va_label['label_id'],
-										array($this->getLabelDisplayField() => '['.caGetBlankLabelText().']'),
+										array($this->getLabelDisplayField() => '['.caGetBlankLabelText($table).']'),
 										$vn_label_locale_id,
 										$vn_label_type_id,
 										false, array('queueIndexing' => true)
@@ -4159,8 +4163,11 @@ if (!$vb_batch) {
 										$vn_rank = $va_rep_ids_sorted[$vn_rank_index];
 									}
 									
+									// import embedded metadata?
+									$vn_object_representation_mapping_id = $po_request->getParameter($vs_prefix_stub.'importer_id_'.$va_rep['relation_id'], pInteger);
+										
 									$vn_rel_type_id = $po_request->getParameter($vs_prefix_stub.'rel_type_id_'.$va_rep['relation_id'], pString);
-									$t_rep = $this->editRepresentation($va_rep['representation_id'], $vs_path, $vals['locale_id'], $vals['status'], $vals['access'], $vals['is_primary'], $vals, array('original_filename' => $vs_original_name, 'rank' => $vn_rank, 'centerX' => $vn_center_x, 'centerY' => $vn_center_y, 'type_id' => $vals['type_id'], 'rel_type_id' => $vn_rel_type_id));
+									$t_rep = $this->editRepresentation($va_rep['representation_id'], $vs_path, $vals['locale_id'], $vals['status'], $vals['access'], $vals['is_primary'], $vals, array('original_filename' => $vs_original_name, 'rank' => $vn_rank, 'centerX' => $vn_center_x, 'centerY' => $vn_center_y, 'type_id' => $vals['type_id'], 'rel_type_id' => $vn_rel_type_id, 'mapping_id' => $vn_object_representation_mapping_id));
 									if ($this->numErrors()) {
 										//$po_request->addActionErrors($this->errors(), $vs_f, $va_rep['relation_id']);
 										foreach($this->errors() as $o_e) {
@@ -4173,32 +4180,6 @@ if (!$vb_batch) {
 													$po_request->addActionError($o_e, $vs_f, $va_rep['relation_id']);
 													break;
 											}
-										}
-									} elseif($vs_path) {
-										// import embedded metadata?
-										$vn_object_representation_mapping_id = $po_request->getParameter($vs_prefix_stub.'importer_id_'.$va_rep['relation_id'], pInteger);
-										
-										$log = caGetImportLogger(['logLevel' => $po_request->getAppConfig()->get('embedded_metadata_extraction_mapping_log_level')]);
-										if(!$vn_object_representation_mapping_id && is_array($media_metadata_extraction_defaults = $po_request->getAppConfig()->getAssoc('embedded_metadata_extraction_mapping_defaults'))) {
-											$media_mimetype = $t_rep->get('mimetype');
-											
-											foreach($media_metadata_extraction_defaults as $m => $importer_code) {
-												if(caCompareMimetypes($media_mimetype, $m)) {
-													if (!($vn_object_representation_mapping_id = ca_data_importers::find(['importer_code' => $importer_code], ['returnAs' => 'firstId']))) {
-														if ($log) { $log->logInfo(_t('Could not find embedded metadata importer with code %1', $importer_code)); }
-													}
-													break;
-												}
-											}
-                                        }
-										
-										if ($vn_object_representation_mapping_id && ($t_mapping = ca_data_importers::find(['importer_id' => $vn_object_representation_mapping_id], ['returnAs' => 'firstModelInstance']))) {
-											$format = $t_mapping->getSetting('inputFormats');
-											if(is_array($format)) { $format = array_shift($format); }
-											if ($log) { $log->logDebug(_t('Using embedded media mapping %1 (format %2)', $t_mapping->get('importer_code'), $format)); }
-											
-											$t_importer = new ca_data_importers();
-											$t_importer->importDataFromSource($t_rep->getMediaPath('media', 'original'), $vn_object_representation_mapping_id, ['logLevel' => $po_request->getAppConfig()->get('embedded_metadata_extraction_mapping_log_level'), 'format' => $format, 'forceImportForPrimaryKeys' => [$t_rep->getPrimaryKey(), 'transaction' => $this->getTransaction()]]); 
 										}
 									}
 									
@@ -4252,40 +4233,57 @@ if (!$vb_batch) {
                             foreach($_REQUEST as $vs_key => $vs_value) {
                                 if (preg_match('/^'.$vs_prefix_stub.'media_url_new_([\d]+)$/', $vs_key, $va_matches)) {
                                     $va_file_list[$vs_key] = array(
-                                        'url' => $vs_value
+                                        'url' => $vs_value,
+                                        'index' => (int)$va_matches[1]
+                                        
                                     );
                                 } elseif(preg_match('/^'.$vs_prefix_stub.'media_new_([\d]+)$/', $vs_key, $va_matches)) {
                                     $va_file_list[$vs_key] = array(
                                         'tmp_name' => $vs_value,
-                                        'name' => $vs_value
+                                        'name' => $vs_value,
+                                        'index' => (int)$va_matches[1]
                                     );
                                 } elseif(preg_match('/^'.$vs_prefix_stub.'autocompletenew_([\d]+)$/', $vs_key, $va_matches)){
 									$va_file_list[$vs_key] = array(
 										'tmp_name' => $vs_value,
-										'name' => $vs_value
+										'name' => $vs_value,
+                                        'index' => (int)$va_matches[1]
 									);
 								} elseif(preg_match('/^'.$vs_prefix_stub.'mediarefsnew_([\d]+)$/', $vs_key, $va_matches)) {
 									$files = explode(";", $vs_value);
 									foreach($files as $f) {
 										$va_file_list["{$vs_key}_{$file_index}"] = [		// Add numeric suffix to allow for multiple uploads in a single request
 											'tmp_name' => $f,
-											'name' => $f
+											'name' => $f,
+                                        	'index' => (int)$va_matches[1]
 										];
 										$file_index++;
 									}
+								} elseif($po_request->getAppConfig()->get('allow_representations_without_media') && preg_match('/^'.$vs_prefix_stub.'no_media_new_([\d]+)$/', $vs_key, $va_matches)) {
+									$index = (int)$va_matches[1];
+									$va_file_list['empty'] = ['index' => $index];
 								}
+                            }
+                            
+                            if(isset($va_file_list['empty'])) {
+                            	$index = $va_file_list['empty']['index'];
+								$va_file_list = array_filter($va_file_list, function($v) use ($index) { return (($v['index'] !== $index) || (sizeof($v) === 1)); });
                             }
                             
                             foreach($va_file_list as $vs_key => $va_values) {
                                 $this->clearErrors();
                             
 								if (
+									($vs_key !== 'empty') &&
 									!preg_match('/^'.$vs_prefix_stub.'media_new_([\d]+)$/', $vs_key, $va_matches) && 
 									!preg_match('/^'.$vs_prefix_stub.'mediarefsnew_([\d]+)_([\d]+)$/', $vs_key, $va_matches) && 
 									(($vb_allow_fetching_of_urls && !preg_match('/^'.$vs_prefix_stub.'media_url_new_([\d]+)$/', $vs_key, $va_matches)) || !$vb_allow_fetching_of_urls) && 
 									(($vb_allow_existing_rep && !preg_match('/^'.$vs_prefix_stub.'autocompletenew_([\d]+)$/', $vs_key, $va_matches))||!$vb_allow_existing_rep) ) {  
 										continue; 
+								} elseif($vs_key === 'empty') {
+									$va_matches = [null, $va_values['index']];
 								}
+								
                                 if($vs_upload_type = $po_request->getParameter($vs_prefix_stub.'upload_typenew_'.$va_matches[1], pString)) {
                                     $po_request->user->setVar('defaultRepresentationUploadType', $vs_upload_type);
                                 }
@@ -4309,12 +4307,14 @@ if (!$vb_batch) {
                                     	$vs_path = $vs_tmp_directory.'/'.$va_values['tmp_name'];
                                     	$md = json_decode(@file_get_contents("{$vs_path}_metadata"), true);
                                         $vs_original_name = $md['original_filename'];
-                                    } else {
+                                    } elseif($vs_key !== 'empty') {
                                         $vs_path = $va_values['tmp_name'];
                                         $vs_original_name = $va_values['name'];
+                                    } else {
+                                    	$vs_path = $vs_original_name = null;
                                     }
                                     
-                                    if (!$vs_path) { continue; }
+                                    if (($vs_key !== 'empty') && !$vs_path) { continue; }
                             
                                     $vn_rep_type_id = $po_request->getParameter([$vs_prefix_stub.'rep_type_id_new_'.$va_matches[1], $vs_prefix_stub.'type_id_new_'.$va_matches[1]], pInteger);
                                     if(!$vn_rep_type_id && !($vn_rep_type_id = caGetDefaultItemID('object_representation_types'))) {
@@ -4340,11 +4340,14 @@ if (!$vb_batch) {
                                    		}
                                 	}
                                 	
+									// import embedded metadata?
+									$vn_object_representation_mapping_id = $po_request->getParameter($vs_prefix_stub.'importer_id_new_'.$va_matches[1], pInteger);
+                                	
                                     // Get user-specified center point (images only)
                                     $vn_center_x = $po_request->getParameter($vs_prefix_stub.'center_x_new_'.$va_matches[1], pString);
                                     $vn_center_y = $po_request->getParameter($vs_prefix_stub.'center_y_new_'.$va_matches[1], pString);
                         
-                                    $t_rep = $this->addRepresentation($vs_path, $vn_rep_type_id, $vals['locale_id'], $vals['status'], $vals['access'], $vn_is_primary, array_merge($vals, ['name' => $vals['rep_label']]), array('original_filename' => $vs_original_name, 'returnRepresentation' => true, 'centerX' => $vn_center_x, 'centerY' => $vn_center_y, 'type_id' => $vn_type_id));	// $vn_type_id = *relationship* type_id (as opposed to representation type)
+                                    $t_rep = $this->addRepresentation($vs_path, $vn_rep_type_id, $vals['locale_id'], $vals['status'], $vals['access'], $vn_is_primary, array_merge($vals, ['name' => $vals['rep_label']]), array('original_filename' => $vs_original_name, 'returnRepresentation' => true, 'centerX' => $vn_center_x, 'centerY' => $vn_center_y, 'type_id' => $vn_type_id, 'mapping_id' => $vn_object_representation_mapping_id));	// $vn_type_id = *relationship* type_id (as opposed to representation type)
                                     
                                     if ($this->numErrors()) {
                                         $po_request->addActionErrors($this->errors(), $vs_f, 'new_'.$va_matches[1]);
@@ -4352,31 +4355,6 @@ if (!$vb_batch) {
                                         if ($t_rep && is_array($pa_options['existingRepresentationMap'])) { 
                                             $pa_options['existingRepresentationMap'][$vs_path] = $t_rep->getPrimaryKey();
                                         }
-                                        // import embedded metadata?
-                                        $vn_object_representation_mapping_id = $po_request->getParameter($vs_prefix_stub.'importer_id_new_'.$va_matches[1], pInteger);
-										
-										if(!$vn_object_representation_mapping_id && is_array($media_metadata_extraction_defaults = $po_request->getAppConfig()->getAssoc('embedded_metadata_extraction_mapping_defaults'))) {
-											$media_mimetype = $t_rep->get('mimetype');
-										
-											$log = caGetImportLogger(['logLevel' => $po_request->getAppConfig()->get('embedded_metadata_extraction_mapping_log_level')]);
-											foreach($media_metadata_extraction_defaults as $m => $importer_code) {
-												if(caCompareMimetypes($media_mimetype, $m)) {
-													if (!($vn_object_representation_mapping_id = ca_data_importers::find(['importer_code' => $importer_code], ['returnAs' => 'firstId']))) {
-														if ($log) { $log->logInfo(_t('Could not find embedded metadata importer with code %1', $importer_code)); }
-													}
-													break;
-												}
-											}
-                                        }
-                                        
-										if ($vn_object_representation_mapping_id && ($t_mapping = ca_data_importers::find(['importer_id' => $vn_object_representation_mapping_id], ['returnAs' => 'firstModelInstance']))) {
-											$format = $t_mapping->getSetting('inputFormats');
-											if(is_array($format)) { $format = array_shift($format); }
-											if ($log) { $log->logDebug(_t('Using embedded media mapping %1 (format %2)', $t_mapping->get('importer_code'), $format)); }
-											
-											$t_importer = new ca_data_importers();
-											$t_importer->importDataFromSource($t_rep->getMediaPath('media', 'original'), $vn_object_representation_mapping_id, ['logLevel' => $po_request->getAppConfig()->get('embedded_metadata_extraction_mapping_log_level'), 'format' => $format, 'forceImportForPrimaryKeys' => [$t_rep->getPrimaryKey(), 'transaction' => $this->getTransaction()]]); 
-										}
                                     }
                                 }
                             }

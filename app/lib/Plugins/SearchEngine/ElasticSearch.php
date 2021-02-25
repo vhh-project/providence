@@ -111,7 +111,12 @@ class WLPlugSearchEngineElasticSearch extends BaseSearchPlugin implements IWLPlu
 	 * @throws \Exception
 	 */
 	public function refreshMapping($pb_force=false) {
-		$o_mapping = new ElasticSearch\Mapping();
+
+		static $o_mapping;
+		if (!$o_mapping) {
+			$o_mapping= new ElasticSearch\Mapping();
+		}
+
 		if($o_mapping->needsRefresh() || $pb_force) {
 			foreach ($o_mapping->get() as $table => $va_config) {
 				$index_name = $this->getIndexName($table);
@@ -295,7 +300,7 @@ class WLPlugSearchEngineElasticSearch extends BaseSearchPlugin implements IWLPlu
 			// @see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-scroll.html
 			// @see https://www.elastic.co/guide/en/elasticsearch/client/php-api/2.0/_search_operations.html#_scan_scroll
 			$type = ($this->version <= 5) ? 'ca' : '_doc';
-			$table = Datamodel::getTableNamr($pn_table_num);
+			$table = Datamodel::getTableName($pn_table_num);
 			$va_search_params = array(
 				'scroll' => '1m',          // how long between scroll requests. should be small!
 				'index' => $this->getIndexName($table),

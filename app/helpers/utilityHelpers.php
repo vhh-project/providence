@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2007-2020 Whirl-i-Gig
+ * Copyright 2007-2021 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -189,7 +189,7 @@ function caMakeProperUTF8ForXML($ps_text){
 
 	$vn_length = strlen($ps_text);
 	for ($i=0; $i < $vn_length; $i++) {
-		$vn_current = ord($ps_text{$i});
+		$vn_current = ord($ps_text[$i]);
 		if (($vn_current == 0x9) ||
 			($vn_current == 0xA) ||
 			($vn_current == 0xD) ||
@@ -746,7 +746,7 @@ function caFileIsIncludable($ps_file) {
 	 * @param int $user_id
 	 * @param array $options Options include:
 	 *		dontCreateDirectory = don't create user directory if it does not exist. [Default is false]
-	 * @return string pa 
+	 * @return string 
 	 */
 	function caGetUserMediaDirectoryPath(int $user_id, array $options=null) {
 	    $config = Configuration::load();
@@ -1602,6 +1602,42 @@ function caFileIsIncludable($ps_file) {
 		
 		if ($t1[0] !== $t2[0]) { return false; }
 		if (($t1[1] === $t2[1]) || ($t1[1] === '*') || ($t2[1] === '*')) { return true; }
+		
+		return false;
+	}
+	# ---------------------------------------
+	/**
+	  * Determine if a mimetype is valid using a list of specific mimetypes, wildcard mimetypes and/or classes.
+	  * The mimetype to be tested may be a specified mimetype (Ex. image/jpeg), a wildcard mimetype (Ex. image/*) or a class (Ex. image)
+	  *
+	  * @param string $mimetype A specific or wildcard mimetype or a class. Ex. image/jpeg, image/*, audio, image, video
+	  * @param array $valid_mimetypes A list of specific or wildcard mimetypes or classes to compare $mimetype against.
+	  * @return bool True if $mimetype is in $valid_mimetypes
+	  */
+	function caMimetypeIsValid(string $mimetype, array $valid_mimetypes) {
+		if(strpos($mimetype, '/') === false) {
+			$mimetypes = caGetMimetypesForClass($mimetype);
+		} else {
+			$mimetypes = [$mimetype];
+		}
+		
+		$valid_mimetypes_exp = [];
+		foreach($valid_mimetypes as $m) {
+			if(strpos($m, '/') === false) {
+				$valid_mimetypes_exp = array_merge($valid_mimetypes_exp, caGetMimetypesForClass($m));
+			} else {
+				$valid_mimetypes_exp[] = $m;
+			}	
+		}
+		
+		foreach($mimetypes as $m1) {
+			foreach($valid_mimetypes_exp as $m2) {
+				if(caCompareMimetypes($m1, $m2)) {
+					return true;
+				}
+			}
+		}
+		
 		
 		return false;
 	}
@@ -2693,15 +2729,22 @@ function caFileIsIncludable($ps_file) {
 	 * Get symbol for currency if available. "USD" will return "$", for example, while
 	 * "CAD" will return "CAD"
 	 *
-	 * @param $ps_value string Currency specifier (Ex. USD, EUR, CAD)
+	 * @param $value string Currency specifier (Ex. USD, EUR, CAD)
+	 * @param $element_code_or_id Metadata element code or element_id. If provided currency symbol settings from the element will be used. If omitted only global (app.conf) settingd will be used. [Default is null]
 	 *
 	 * @return string Symbol (Ex. $, £, ¥) or currency specifier if no symbol is available
 	 */
-	function caGetCurrencySymbol($ps_value) {
+	function caGetCurrencySymbol($value, $element_code_or_id=null) {
 		$o_config = Configuration::load();
-		$vs_dollars_are_this = strtolower($o_config->get('default_dollar_currency'));
-		switch(strtolower($ps_value)) {
-			case $vs_dollars_are_this:
+		
+		$dollars_are_this = null;
+		if($element_code_or_id && ($t_element = ca_metadata_elements::getInstance($element_code_or_id))) {
+			$dollars_are_this = strtolower($t_element->getSetting('dollarCurrency'));
+		}
+		if (!$dollars_are_this) { $dollars_are_this = strtolower($o_config->get('default_dollar_currency')); }
+		
+		switch(strtolower($value)) {
+			case $dollars_are_this:
 				return '$';
 			case 'eur':
 				return '€';
@@ -2710,7 +2753,7 @@ function caFileIsIncludable($ps_file) {
 			case 'jpy':
 				return '¥';
 		}
-		return $ps_value;
+		return $value;
 	}
 	# ----------------------------------------
 	/**
@@ -2724,15 +2767,15 @@ function caFileIsIncludable($ps_file) {
 
 		// either
 		if (preg_match("!^([^\d]+)([\d\.\,]+)$!", trim($ps_value), $va_matches)) {
-			$vs_decimal_value = $va_matches[2];
+			$vs_decimal_value = round((float)$va_matches[2], 2);
 			$vs_currency_specifier = trim($va_matches[1]);
 		// or 1
 		} else if (preg_match("!^([\d\.\,]+)([^\d]+)$!", trim($ps_value), $va_matches)) {
-			$vs_decimal_value = $va_matches[1];
+			$vs_decimal_value = round((float)$va_matches[1], 2);
 			$vs_currency_specifier = trim($va_matches[2]);
 		// or 2
 		} else if (preg_match("!(^[\d\,\.]+$)!", trim($ps_value), $va_matches)) {
-			$vs_decimal_value = $va_matches[1];
+			$vs_decimal_value = round((float)$va_matches[1], 2);
 			$vs_currency_specifier = null;
 		}
 
@@ -3937,7 +3980,7 @@ function caFileIsIncludable($ps_file) {
 		$vs_display_value = trim(preg_replace('![^\p{L}0-9 ]+!u', ' ', $ps_text));
 
 		// Move articles to end of string
-		$va_articles = caGetArticlesForLocale($ps_locale);
+		$va_articles = caGetArticlesForLocale($ps_locale) ?: [];
 
 		foreach($va_articles as $vs_article) {
 			if (preg_match('!^('.$vs_article.')[ ]+!i', $vs_display_value, $va_matches)) {

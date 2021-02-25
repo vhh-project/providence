@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2012-2020 Whirl-i-Gig
+ * Copyright 2012-2021 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -101,7 +101,7 @@
 			currentSelectionDisplayID: 'browseCurrentSelection',
 
 			onSelection: function(item_id, path, name, type) {
-				if (type == 'DIR') { jQuery('#caDirectoryValue').val(path); }
+				if (type == 'DIR') { jQuery('#caDirectoryValue').val(path); } else { jQuery('#caDirectoryValue').val(''); }
 			}
 		});
 
@@ -502,18 +502,34 @@
 				<span class="formLabelText"><?php print _t('Miscellaneous'); ?></span>
 					<div class="bundleContainer">
 						<div class="caLabelList" >
-							<p class='formLabel'>
-	<?php
-				print caHTMLCheckboxInput('allow_duplicate_media', array('value' => 1,  'id' => 'caAllowDuplicateMedia', 'checked' => $va_last_settings['allowDuplicateMedia']), array());
-				print " "._t('Allow duplicate media?');
-	?>
-							</p>
+							<table>
+								<tr valign="top">
+									<td>
 							<p class='formLabel'>
 	<?php
 								print _t('Log level').'<br/>';
 								print caHTMLSelect('log_level', caGetLogLevels(), array('id' => 'caLogLevel'), array('value' => $va_last_settings['logLevel']));
 	?>
 							</p>
+									</td>
+									<td>
+							<p class='formLabel'>
+	<?php
+				print caHTMLCheckboxInput('allow_duplicate_media', array('value' => 1,  'id' => 'caAllowDuplicateMedia', 'checked' => $va_last_settings['allowDuplicateMedia']), []);
+				print " "._t('Allow duplicate media?');
+	?>
+							</p>
+									</td>
+									<td>
+							<p class='formLabel'>
+	<?php
+				print caHTMLCheckboxInput('replace_existing_media', array('value' => 1,  'id' => 'caReplaceExistingMedia', 'checked' => 0), array());
+				print " "._t('Replace existing media?');
+	?>
+							</p>
+									</td>
+								</tr>
+							</table>
 						</div>
 					</div>
 			</div>
@@ -532,7 +548,8 @@
 	<script type="text/javascript">
 		function caShowConfirmBatchExecutionPanel() {
 			var msg = '<?php print addslashes(_t("You are about to import files from <em>%1</em>")); ?>';
-			msg = msg.replace("%1", jQuery('#caDirectoryValue').val());
+			var dir = jQuery('#caDirectoryValue').val();
+			msg = msg.replace("%1", dir ? dir : '<?= addslashes('the import root'); ?>');
 			caConfirmBatchExecutionPanel.showPanel();
 			jQuery('#caConfirmBatchExecutionPanelAlertText').html(msg);
 		}
