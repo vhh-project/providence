@@ -2085,6 +2085,7 @@ create table ca_attributes
    locale_id                      smallint unsigned              null,
    table_num                      tinyint unsigned               not null,
    row_id                         int unsigned                   not null,
+value_source                   varchar(255)                   null default null,
    primary key (attribute_id),
    constraint fk_ca_attributes_element_id foreign key (element_id)
       references ca_metadata_elements (element_id) on delete restrict on update restrict,
