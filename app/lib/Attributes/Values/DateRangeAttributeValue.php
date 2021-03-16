@@ -123,6 +123,14 @@
 			),
 			'description' => _t('Format to use for dates selected from the date picker. (The default is YY-MM-DD format.)')
 		),
+		'placeholder' => array(
+			'formatType' => FT_TEXT,
+			'displayType' => DT_FIELD,
+			'default' => 'yy-mm-dd',
+			'width' => 20, 'height' => 1,
+			'label' => _t('Placeholder text'),
+			'description' => _t('The placeholder attribute specifies a short hint that describes the expected value of an input field (e.g. a sample value or a short description of the expected format)')
+		),
 		'mustNotBeBlank' => array(
 			'formatType' => FT_NUMBER,
 			'displayType' => DT_CHECKBOXES,
@@ -417,7 +425,7 @@
  		 * @return string
  		 */
  		public function htmlFormElement($pa_element_info, $pa_options=null) {
-			$va_settings = $this->getSettingValuesFromElementArray($pa_element_info, array('fieldWidth', 'suggestExistingValues', 'useDatePicker', 'datePickerDateFormat'));
+			$va_settings = $this->getSettingValuesFromElementArray($pa_element_info, array('fieldWidth', 'suggestExistingValues', 'useDatePicker', 'datePickerDateFormat', 'placeholder'));
 			$vs_class = trim((isset($pa_options['class']) && $pa_options['class']) ? $pa_options['class'] : 'dateBg');
 			
 			if (isset($pa_options['useDatePicker'])) {
@@ -432,7 +440,8 @@
 					'size' => (isset($pa_options['width']) && $pa_options['width'] > 0) ? $pa_options['width'] : $va_settings['fieldWidth'],
 					'value' => '{{'.$pa_element_info['element_id'].'}}',
 					'maxlength' => $vn_max_length,
-					'class' => $vs_class
+					'class' => $vs_class,
+                    'placeholder' => $va_settings['placeholder']
 				)
 			);
 			
