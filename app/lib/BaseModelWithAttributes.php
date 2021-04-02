@@ -145,18 +145,22 @@
 				}	// # attributes is at upper limit
 			}
 			
+			// VHH - BUGFIX START
+			// See MMSI-969: Search index not updated when adding new meta data elements
+			// $vn_element_id is used again which corrupts the registration of the element id in _FIELD_VALUE_CHANGED
+			// Changed $vn_element_id to $vn_sub_element_id
 			if (caGetOption('skipExistingValues', $pa_options, false) || !caGetOption('allowDuplicateValues', $element_info, false)) {
 				 // filter out any values that already exist on this row
 			    if(is_array($va_attrs = $this->getAttributesByElement($pm_element_code_or_id))) {
 			        $vb_already_exists = false;
 			        foreach($va_attrs as $o_attr) {
 			            foreach($o_attr->getValues() as $o_value) {
-			                $vn_element_id = $o_value->getElementID();
-			                $vs_element_code = ca_metadata_elements::getElementCodeForId($vn_element_id);
+			                $vn_sub_element_id = $o_value->getElementID();
+			                $vs_element_code = ca_metadata_elements::getElementCodeForId($vn_sub_element_id);
 			                
 			                $pv = $o_value->getDisplayValue(['dateFormat' => 'original']); // need to compare dates as-entered
 			                if (
-			                	(strlen($pa_values[$vn_element_id] && ($pa_values[$vn_element_id] != $pv)))
+			                	(strlen($pa_values[$vn_sub_element_id] && ($pa_values[$vn_sub_element_id] != $pv)))
 			            		||
 			            		(strlen($pa_values[$vs_element_code] && ($pa_values[$vs_element_code] != $pv)))
 			            	) {
@@ -171,6 +175,7 @@
 			        }
 			    }
 			}
+			// VHH - BUGFIX END
 			
 			$this->opa_attributes_to_add[] = array(
 				'values' => $pa_values,
@@ -189,7 +194,6 @@
 		public function _addAttribute($pa_values, $pm_element_code_or_id, $po_trans=null, $pa_info=null, $valueSource=null) {
 			if (!($t_element = ca_metadata_elements::getInstance($pm_element_code_or_id))) { return false; }
 			if ($t_element->get('parent_id') > 0) { return false; }
-			
 			$t_attr = new ca_attributes();
 			$t_attr->purify($this->purify());
 			if ($po_trans) { $t_attr->setTransaction($po_trans); }
