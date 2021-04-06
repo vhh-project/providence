@@ -606,12 +606,78 @@ class ItemService extends BaseJSONService {
 							else if ($vs_rel_table == 'ca_entities') {
 								$vs_rel_table_name = 'ca_objects_x_entities';
 							}
+							else if ($vs_rel_table == 'ca_occurrences') {
+								$vs_rel_table_name = 'ca_objects_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_places') {
+								$vs_rel_table_name = 'ca_objects_x_places';
+							}
+							else if ($vs_rel_table == 'ca_collections') {
+								$vs_rel_table_name = 'ca_objects_x_collections';
+							}
 						} else if ($this->ops_table == 'ca_entities') {
 							if ($vs_rel_table == 'ca_objects') {
 								$vs_rel_table_name = 'ca_objects_x_entities';
 							}
 							else if ($vs_rel_table == 'ca_entities') {
 								$vs_rel_table_name = 'ca_entities_x_entities';
+							}
+							else if ($vs_rel_table == 'ca_occurrences') {
+								$vs_rel_table_name = 'ca_entities_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_places') {
+								$vs_rel_table_name = 'ca_entities_x_places';
+							}
+							else if ($vs_rel_table == 'ca_collections') {
+								$vs_rel_table_name = 'ca_entities_x_collections';
+							}
+						} else if ($this->ops_table == 'ca_occurrences') {
+							if ($vs_rel_table == 'ca_objects') {
+								$vs_rel_table_name = 'ca_objects_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_entities') {
+								$vs_rel_table_name = 'ca_entities_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_occurrences') {
+								$vs_rel_table_name = 'ca_occurrences_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_places') {
+								$vs_rel_table_name = 'ca_places_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_collections') {
+								$vs_rel_table_name = 'ca_occurrences_x_collections';
+							}
+						} else if ($this->ops_table == 'ca_places') {
+							if ($vs_rel_table == 'ca_objects') {
+								$vs_rel_table_name = 'ca_objects_x_places';
+							}
+							else if ($vs_rel_table == 'ca_entities') {
+								$vs_rel_table_name = 'ca_entities_x_places';
+							}
+							else if ($vs_rel_table == 'ca_occurrences') {
+								$vs_rel_table_name = 'ca_places_x_occurrences';
+							}
+							else if ($vs_rel_table == 'ca_places') {
+								$vs_rel_table_name = 'ca_places_x_places';
+							}
+							else if ($vs_rel_table == 'ca_collections') {
+								$vs_rel_table_name = 'ca_places_x_collections';
+							}
+						} else if ($this->ops_table == 'ca_collections') {
+							if ($vs_rel_table == 'ca_objects') {
+								$vs_rel_table_name = 'ca_objects_x_collections';
+							}
+							else if ($vs_rel_table == 'ca_entities') {
+								$vs_rel_table_name = 'ca_entities_x_collections';
+							}
+							else if ($vs_rel_table == 'ca_occurrences') {
+								$vs_rel_table_name = 'ca_occurrences_x_collections';
+							}
+							else if ($vs_rel_table == 'ca_places') {
+								$vs_rel_table_name = 'ca_places_x_collections';
+							}
+							else if ($vs_rel_table == 'ca_collections') {
+								$vs_rel_table_name = 'ca_collections_x_collections';
 							}
 						}
 
