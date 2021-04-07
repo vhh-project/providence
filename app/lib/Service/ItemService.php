@@ -1453,6 +1453,16 @@ class ItemService extends BaseJSONService {
 		}
     // VHH - END
 
+    // VHH - START
+		if(is_array($va_post["update_relationship_types"]) && sizeof($va_post["update_relationship_types"])) {
+			foreach($va_post["update_relationship_types"] as $vs_table => $va_relationship_info) {
+				foreach ($va_relationship_info as $va_relationship) {
+					$t_instance->editRelationship($vs_table, $va_relationship['relation_id'], $va_relationship['rel_id'], $va_relationship['type_id']);	
+				}
+			}
+		}
+    // VHH - END
+
 		if(is_array($va_post["related"]) && sizeof($va_post["related"])>0) {
 			foreach($va_post["related"] as $vs_table => $va_relationships) {
 				foreach($va_relationships as $va_relationship) {
