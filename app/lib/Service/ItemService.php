@@ -1454,6 +1454,7 @@ class ItemService extends BaseJSONService {
     // VHH - END
 
     // VHH - START
+		// Update relationship type for existing relations
 		if(is_array($va_post["update_relationship_types"]) && sizeof($va_post["update_relationship_types"])) {
 			foreach($va_post["update_relationship_types"] as $vs_table => $va_relationship_info) {
 				foreach ($va_relationship_info as $va_relationship) {
@@ -1462,6 +1463,22 @@ class ItemService extends BaseJSONService {
 			}
 		}
     // VHH - END
+
+		// VHH - START
+		// Delete interstitial records from relationships
+		if(is_array($va_post["delete_interstitial"]) && sizeof($va_post["delete_interstitial"])) {
+			foreach($va_post["delete_interstitial"] as $vs_table => $va_relationship_info) {
+				if ($t_rel_instance = $t_instance->getRelationshipInstance($vs_table)) {
+					foreach ($va_relationship_info as $va_relationship) {
+						$t_rel_instance->load($va_relationship['relation_id']);
+						$t_rel_instance->removeAttribute($va_relationship['interstitial_id']);
+						$t_rel_instance->setMode(ACCESS_WRITE);
+						$t_rel_instance->update();
+					}
+				}
+			}
+		}
+		// VHH - END
 
 		if(is_array($va_post["related"]) && sizeof($va_post["related"])>0) {
 			foreach($va_post["related"] as $vs_table => $va_relationships) {
