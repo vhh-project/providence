@@ -1369,6 +1369,7 @@ class ItemService extends BaseJSONService {
 						if (isset($va_value['_value_source'])) {
 							$o_db = new Db();
 							$o_db->query("UPDATE ca_attributes SET value_source=\"".$va_value['_value_source']."\" WHERE attribute_id = ".$vs_attribute_id, []);
+							unset($va_value['_value_source']);
 						}
 
 						if($va_value["locale"]) {
@@ -1465,6 +1466,65 @@ class ItemService extends BaseJSONService {
     // VHH - END
 
 		// VHH - START
+		// Add interstitial record
+		// Update existing interstitial record
+		if(is_array($va_post["add_interstitial"]) && sizeof($va_post["add_interstitial"])) {
+			foreach($va_post["add_interstitial"] as $vs_table => $va_relationship_info) {
+				if ($t_rel_instance = $t_instance->getRelationshipInstance($vs_table)) {
+					foreach ($va_relationship_info as $va_relationship) {
+						$t_rel_instance->load($va_relationship['relation_id']);
+
+						foreach ($va_relationship['attrs'] as $vs_attribute_name => $va_values) {
+							foreach($va_values as $va_value) {
+								$valueSource = '';
+
+								if (isset($va_value['_value_source'])) {
+									$valueSource = $va_value['_value_source'];
+									unset($va_value['_value_source']);
+								}
+
+								$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
+								$t_rel_instance->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+							}
+						}
+						$t_rel_instance->setMode(ACCESS_WRITE);
+						$t_rel_instance->update();
+					}
+				}
+			}
+		}
+
+		// Update existing interstitial record
+		if(is_array($va_post["update_interstitial"]) && sizeof($va_post["update_interstitial"])) {
+			foreach($va_post["update_interstitial"] as $vs_table => $va_relationship_info) {
+				if ($t_rel_instance = $t_instance->getRelationshipInstance($vs_table)) {
+					foreach ($va_relationship_info as $va_relationship) {
+						$t_rel_instance->load($va_relationship['relation_id']);
+
+						foreach ($va_relationship['attrs'] as $vs_attribute_name => $va_values) {
+							foreach($va_values as $va_value) {
+								if (!empty($va_value['_id'])) {
+									$vs_attribute_id = $va_value['_id'];
+									unset($va_value['_id']);
+
+									if (isset($va_value['_value_source'])) {
+										$o_db = new Db();
+										$o_db->query("UPDATE ca_attributes SET value_source=\"".$va_value['_value_source']."\" WHERE attribute_id = ".$vs_attribute_id, []);
+										unset($va_value['_value_source']);
+									}
+
+									$va_value["locale_id"] = ca_locales::getDefaultCataloguingLocaleID();
+									$t_rel_instance->editAttribute($vs_attribute_id, $vs_attribute_name, $va_value);
+							  }
+							}
+						}
+						$t_rel_instance->setMode(ACCESS_WRITE);
+						$t_rel_instance->update();
+					}
+				}
+			}
+		}
+
 		// Delete interstitial records from relationships
 		if(is_array($va_post["delete_interstitial"]) && sizeof($va_post["delete_interstitial"])) {
 			foreach($va_post["delete_interstitial"] as $vs_table => $va_relationship_info) {
