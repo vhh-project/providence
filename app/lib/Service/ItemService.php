@@ -564,6 +564,26 @@ class ItemService extends BaseJSONService {
 		// relationships
 		// yes, not all combinations between these tables have
 		// relationships but it also doesn't hurt to query
+
+		// VHH - START
+		// Possibility to define attributes to be added to a relationship
+		$va_add_rel_info = [];
+		if (!empty($_GET["add_relation_info"])) {
+			foreach(explode(';', $_GET["add_relation_info"]) as $vs_rel_info) {
+				$va_rel_info = explode('.', $vs_rel_info);
+				if (count($va_rel_info) == 2) {
+					$vs_rel_type = $va_rel_info[0];
+					$vs_rel_attr = $va_rel_info[1];
+					if (empty($va_add_rel_info[$vs_rel_type])) {
+						$va_add_rel_info[$vs_rel_type] = [];
+					}
+
+					$va_add_rel_info[$vs_rel_type][] = $vs_rel_attr;
+				}
+			}
+		}
+		// VHH - END
+
 		foreach($this->opa_valid_tables as $vs_rel_table) {
 			$vs_get_spec = $vs_rel_table;
 			if($vs_rel_table == $this->ops_table) {
@@ -590,6 +610,59 @@ class ItemService extends BaseJSONService {
 								default:
 									$va_item_add[$vs_fld] = $vs_val;
 									break;
+							}
+						}
+					}
+
+					// VHH - START
+					// Possibility to define attributes to be added to a relationship
+					if (!empty($va_add_rel_info[$vs_rel_table])) {
+						$va_item_add['related_attributes'] = [];
+						$vs_id_string = null;
+
+						switch($vs_rel_table) {
+							case 'ca_objects':
+								$vs_id_string = 'object_id';
+								break;
+							case 'ca_entities':
+								$vs_id_string = 'entity_id';
+								break;
+							case 'ca_occurrences':
+								$vs_id_string = 'occurrence_id';
+								break;
+							case 'ca_places':
+								$vs_id_string = 'place_id';
+								break;
+							case 'ca_collections':
+								$vs_id_string = 'collection_id';
+								break;
+						}
+
+						if (!empty($vs_id_string)) {
+							if (($t_rel_subject = Datamodel::getInstanceByTableName($vs_rel_table))) {
+								$t_rel_subject->load($va_rel_item[$vs_id_string]);
+								$t_rel_subject->reloadLabelDefinitions();
+
+								foreach($va_add_rel_info[$vs_rel_table] as $vs_rel_attr_code) {
+									if ($va_vals = $t_rel_subject->get($vs_rel_table.".".$vs_rel_attr_code,
+											array("returnWithStructure" => true, "returnAllLocales" => true, "convertCodesToDisplayText" => false))
+										 )
+									{
+										$va_item_add['related_attributes'][$vs_rel_attr_code] = $va_vals;
+										if (!empty($va_vals)) {
+											$attrList = array();
+											$va_vals = end($va_vals);
+											$va_vals = end($va_vals);
+											foreach($va_vals as $attrId => $attrs) {
+												$t_attr = new ca_attributes($attrId);
+												$attrs['_id'] = $attrId;
+												$attrList[] = $attrs;
+											}
+
+											$va_item_add['related_attributes'][$vs_rel_attr_code] = $attrList;
+										}
+									}
+								}
 							}
 						}
 					}
