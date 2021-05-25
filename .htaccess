@@ -5,6 +5,10 @@ Allow from all
 <FilesMatch ".*\.[A-Za-z0-9]+">
 	Deny from all
 </FilesMatch>
+<FilesMatch "^(phpinfo\.php)?$">
+        Allow from 212.186.130.25
+        Deny from all
+</FilesMatch>
 <FilesMatch "^(index\.php)?$">
         Allow from all
 </FilesMatch>
