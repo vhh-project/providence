@@ -1,5 +1,6 @@
 /nbproject/*
 /app/tmp/*
+/app/log/*
 app/conf/local/*
 setup.php
 /media*
