@@ -57,24 +57,4 @@
 			$this->view->setVar("content",array('authToken' => Session::getServiceAuthToken()));
 			$this->render('json.php');
 		}
-		# -------------------------------------------------------
-		# VHH: Added a me resource in order to get information about the logged in user
-		public function me() {
-			if(!Session::getSessionID()) {
-				$this->view->setVar("errors", array("Invalid session"));
-				$this->render("json_error.php");
-				return;
-			}
-
-			$vs_user_id = $this->request->getUserID();
-			$t_user = new ca_users($vs_user_id);
-
-			$this->view->setVar("content",array(
-				'id' => $vs_user_id,
-				'username' => $t_user->get('ca_users.user_name'),
-				'name' => $t_user->get('ca_users.fname').' '.$t_user->get('ca_users.lname'),
-				'email' => $t_user->get('ca_users.email')
-			));
-			$this->render('json.php');
-		}
 	}
