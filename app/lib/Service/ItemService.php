@@ -615,6 +615,13 @@ class ItemService extends BaseJSONService {
 					}
 
 					// VHH - START
+					// Add item type name (e.g. 'AV Manifestation')
+					if (!empty($va_item_add['item_type_id'])) {
+						$va_item_add['item_type_name'] = $t_instance->getTypeName($va_item_add['item_type_id']);
+					}
+					// VHH - END
+
+					// VHH - START
 					// Possibility to define attributes to be added to a relationship
 					if (!empty($va_add_rel_info[$vs_rel_table])) {
 						$va_item_add['related_attributes'] = [];
