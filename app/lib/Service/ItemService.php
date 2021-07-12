@@ -1320,7 +1320,7 @@ class ItemService extends BaseJSONService {
 		// Create new primary Representation
 		$t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
-			caGetOption('type', $va_rep, 'front'), // this might be retarded but most people don't change the representation type list
+			caGetOption('type', $va_rep, 'high_res'), // high_res seems to be a custom type in VHH
 			ca_locales::getDefaultCataloguingLocaleID(),
 			0,				// Status
 			1,				// Access Status
