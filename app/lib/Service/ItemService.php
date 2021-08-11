@@ -1316,7 +1316,7 @@ class ItemService extends BaseJSONService {
 			$this->addError('missing_file_data');
 			return false;
 		}
-		
+
 		// Create new primary Representation
 		$t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
@@ -1539,7 +1539,12 @@ class ItemService extends BaseJSONService {
 		if(is_array($va_post["update_relationship_types"]) && sizeof($va_post["update_relationship_types"])) {
 			foreach($va_post["update_relationship_types"] as $vs_table => $va_relationship_info) {
 				foreach ($va_relationship_info as $va_relationship) {
-					$t_instance->editRelationship($vs_table, $va_relationship['relation_id'], $va_relationship['rel_id'], $va_relationship['type_id']);	
+					if (!empty($va_relationship['direction']) && $va_relationship['direction'] == 'rtol') {
+						$vs_direction = 'rtol';
+					} else {
+						$vs_direction = 'ltor';
+					}
+					$t_instance->editRelationship($vs_table, $va_relationship['relation_id'], $va_relationship['rel_id'], $va_relationship['type_id'], null, null, $vs_direction);
 				}
 			}
 		}
