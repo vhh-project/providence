@@ -84,6 +84,7 @@ class ModelService extends BaseJSONService {
 	}
 	# -------------------------------------------------------
 	private function getModelInfoForType($ps_type){
+		$o_db = new Db();
 		$t_instance = $this->_getTableInstance($this->getTableName());
 		$t_list = new ca_lists();
 		$va_return = array();
@@ -108,6 +109,21 @@ class ModelService extends BaseJSONService {
 			foreach($t_element->getElementsInSet() as $va_element_in_set){
 				if($va_element_in_set["datatype"]==0) continue; // don't include sub-containers
 				$va_element_in_set["datatype"] = ca_metadata_elements::getAttributeNameForTypeCode($va_element_in_set["datatype"]);
+
+				// VHH - START
+				// Add description to sub-elements
+				$qr_res = $o_db->query("
+						SELECT description
+						FROM ca_metadata_element_labels
+						WHERE element_id = ?
+						LIMIT 1
+					", (int)$va_element_in_set['element_id']);
+
+				if ($qr_res->nextRow()) {
+					$va_element_in_set["description"] = $qr_res->get('description');
+				}
+				// VHH - END
+
 				$va_elements[$vs_code]["elements_in_set"][$va_element_in_set["element_code"]] = $va_element_in_set;
 			}
 
