@@ -1038,7 +1038,8 @@ class WLPlugSearchEngineSqlSearch extends BaseSearchPlugin implements IWLPlugSea
 							$va_range = $this->opo_tep->getUnixTimestamps();
 							$vn_user_id = null;
 							if ($vs_field = trim($vs_field)) {
-								if (!is_int($vs_field)) {
+								// VHH - MMSI-1282: fixed bug - corrected to is_numeric in order to check the string value for being a number
+								if (!is_numeric($vs_field)) {
 									$t_user = new ca_users();
 									if (
 									    $t_user->load(array("user_name" => $vs_field))
