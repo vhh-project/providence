@@ -1017,6 +1017,7 @@ class SearchResult extends BaseObject {
 	public function get($ps_field, $pa_options=null) {
 		$vb_return_as_count = isset($pa_options['returnAsCount']) ? (bool)$pa_options['returnAsCount'] : false;
 		$vb_return_as_array = isset($pa_options['returnAsArray']) ? (bool)$pa_options['returnAsArray'] : false;
+
 		$vb_return_with_structure = isset($pa_options['returnWithStructure']) ? (bool)$pa_options['returnWithStructure'] : false;
 		if ($vb_return_as_search_result = isset($pa_options['returnAsSearchResult']) ? (bool)$pa_options['returnAsSearchResult'] : false) {
 			$vb_return_as_array = true; 
@@ -1072,6 +1073,7 @@ class SearchResult extends BaseObject {
 		$vb_convert_codes_to_display_text 	= isset($pa_options['convertCodesToDisplayText']) ? (bool)$pa_options['convertCodesToDisplayText'] : false;
 		$vb_convert_codes_to_idno 			= isset($pa_options['convertCodesToIdno']) ? (bool)$pa_options['convertCodesToIdno'] : false;
 		$vb_convert_codes_to_value 			= isset($pa_options['convertCodesToValue']) ? (bool)$pa_options['convertCodesToValue'] : false;
+		$vb_return_value_source 			= isset($pa_options['returnValueSource']) ? (bool)$pa_options['returnValueSource'] : false;
 		
 		$vb_strip_tags			 			= isset($pa_options['stripTags']) ? (bool)$pa_options['stripTags'] : false;
 		
@@ -1127,7 +1129,8 @@ class SearchResult extends BaseObject {
 			'template' => $vs_template,
 			'useLocaleCodes' => $vb_use_locale_codes,
 			'excludeValues' => $va_exclude_values,
-			'excludeIdnos' => $va_exclude_idnos
+			'excludeIdnos' => $va_exclude_idnos,
+			'returnValueSource' => $vb_return_value_source
 		));
 		
 		
@@ -1165,6 +1168,34 @@ class SearchResult extends BaseObject {
 		
 		$vn_row_id = $this->opo_engine_result->get($this->ops_table_pk);
 		$va_val_opts['primaryKey'] = $t_instance->primaryKey();
+
+		// Retrieve the value source of an attribute. Implemented as a special "returnValueSource" option which is handled 
+		// before the complex if statement structure below as to not introduce any side effects or break existing functionality.
+		if ($va_val_opts['returnValueSource']) {
+
+			// The next two if statements are taken from the metadata attribute retrieval further below in the method, see "[PRIMARY TABLE] Metadata attribute"
+			if (($t_instance instanceof BaseModelWithAttributes) && isset($va_path_components['field_name']) && $va_path_components['field_name'] && $t_element = ca_metadata_elements::getInstance($va_path_components['field_name'])) {
+				$vn_element_id = $t_element->getPrimaryKey();
+			} else {
+				return $pa_options['returnAsArray'] ? array() : null;
+			}
+			if (!isset(ca_attributes::$s_get_attributes_cache[(int)$this->opn_table_num.'/'.(int)$vn_row_id][(int)$vn_element_id])) {
+				$va_element_ids = ($vn_element_id ? array($vn_element_id) : null);
+				if(is_array($va_prefetch_attributes = $this->getOption('prefetchAttributes')) && sizeof($va_prefetch_attributes)) {
+					$va_element_ids = array_unique($va_element_ids + $va_prefetch_attributes);
+				}
+				ca_attributes::prefetchAttributes($this->opo_subject_instance->getDb(), $this->opn_table_num, $this->getRowIDsToPrefetch($this->opo_engine_result->currentRow(), $this->getOption('prefetch')), $va_element_ids, array('dontFetchAlreadyCachedValues' => true));
+			}
+
+			$va_attributes = ca_attributes::getAttributes($this->opo_subject_instance->getDb(), $this->opn_table_num, $vn_row_id, array($vn_element_id), array());
+
+			if (sizeof($va_attributes[$vn_element_id]) == 1) {
+				$vm_val = $va_attributes[$vn_element_id][0]->getValueSource();
+				return $pa_options['returnAsArray'] ? [$vm_val] : $vm_val;
+			} else {
+				return $pa_options['returnAsArray'] ? array() : null;
+			}
+		}
 		
 		if ($va_path_components['hierarchical_modifier']) {
 			
