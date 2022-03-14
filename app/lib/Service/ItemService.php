@@ -483,10 +483,21 @@ class ItemService extends BaseJSONService {
 
 		// representations for representable stuff
 		// VHH: Added $va_versions in order to show the path of the  original media
+		// VHH: Added ACL restrictions
 		if($t_instance instanceof RepresentableBaseModel) {
 			$va_reps = $t_instance->getRepresentations($va_versions);
 			if(is_array($va_reps) && (sizeof($va_reps)>0)) {
-				$va_return['representations'] = caSanitizeArray($va_reps, ['removeNonCharacterData' => true]);
+				$va_allowed_reps = array();
+				foreach($va_reps as $va_rep) {
+					$pn_representation_id = $va_rep['representation_id'];
+					$t_representation_instance = new ca_object_representations($pn_representation_id);
+					
+					$access_allowed = caCanRead(intval($this->opo_request->getUserID()), 'ca_object_representations', $va_rep['representation_id']);
+					if($access_allowed) {
+						array_push($va_allowed_reps, $va_rep);
+					}
+				}
+				$va_return['representations'] = caSanitizeArray($va_allowed_reps, ['removeNonCharacterData' => true]);
 			}
 		}
 
