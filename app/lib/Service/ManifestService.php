@@ -95,20 +95,17 @@ class ManifestService extends BaseJSONService {
 						&& !empty($va_allowed_rep['urls'])
 						&& !empty($va_allowed_rep['urls']['original'])) {
 						$vs_original_url = $va_allowed_rep['urls']['original'];
-						$vs_original_url = str_replace('http://ca/providence', $vs_host.'/mmsi/api/ca', $vs_original_url);
+						$vs_original_url = str_replace(array('http://ca/providence', 'https://ca/providence'), $vs_host.'/mmsi/api/ca', $vs_original_url);
 						$va_return['@id'] = $vs_original_url;
 
 						if (!empty($va_allowed_rep['urls']['preview170'])) {
 							$vs_thumb_url = $va_allowed_rep['urls']['preview170'];
-							$vs_thumb_url = str_replace('http://ca/providence', $vs_host.'/mmsi/api/ca', $vs_thumb_url);
+							$vs_thumb_url = str_replace(array('http://ca/providence', 'https://ca/providence'), $vs_host.'/mmsi/api/ca', $vs_thumb_url);
 							$va_return['thumbnail'] = array(
 								'@id' => $vs_thumb_url,
 								'@type' => 'dctypes:Image'
 							);
 						}
-						
-						//http://ca/providence/media/collectiveaccess/images/0/43632_ca_object_representations_media_1_preview170.jpg
-						//http://vhh-dev.test/mmsi/api/ca/media/collectiveaccess/images/0/43976_ca_object_representations_media_1_original.jpg
 
 						if ($va_allowed_rep['mimetype'] == 'application/pdf') {
 							$va_return['mediaSequences'] = array(
