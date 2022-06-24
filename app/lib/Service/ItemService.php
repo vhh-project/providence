@@ -1478,6 +1478,8 @@ class ItemService extends BaseJSONService {
 		}
 		// VHH CHANGES - END
 
+		$errors_so_far = $t_instance->getErrors();
+
 		$t_instance->setMode(ACCESS_WRITE);
 		$t_instance->update();
 
@@ -1713,8 +1715,9 @@ class ItemService extends BaseJSONService {
             }
         }
 
-		if($t_instance->numErrors()>0) {
-			foreach($t_instance->getErrors() as $vs_error) {
+		// if($t_instance->numErrors()>0) {
+		if (count($errors_so_far) > 0) {
+			foreach($errors_so_far as $vs_error) {
 				$this->addError($vs_error);
 			}
 			return false;
