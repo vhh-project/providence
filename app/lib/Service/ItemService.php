@@ -1134,7 +1134,7 @@ class ItemService extends BaseJSONService {
 						unset($va_value['_value_source']);
 					}
 
-					$t_instance->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+					$t_instance->addAttribute($va_value,$vs_attribute_name,null,array('forceNoDuplicateChecking' => true),$valueSource);
 				}
 			}
 		}
@@ -1243,7 +1243,7 @@ class ItemService extends BaseJSONService {
 											unset($va_value['_value_source']);
 										}
 
-										$t_rel->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+										$t_rel->addAttribute($va_value,$vs_attribute_name,null,array('forceNoDuplicateChecking' => true),$valueSource);
 										// VHH CHANGES - END
 
 										$vb_have_to_update = true;
@@ -1444,7 +1444,7 @@ class ItemService extends BaseJSONService {
 						unset($va_value['_value_source']);
 					}
 
-					$t_instance->addAttribute($va_value,$vs_attribute_name,null,null,$valueSource);
+					$t_instance->addAttribute($va_value,$vs_attribute_name,null,array('forceNoDuplicateChecking' => true),$valueSource);
 				}
 			}
 		}
