@@ -145,34 +145,31 @@
 				}	// # attributes is at upper limit
 			}
 
-			if (!caGetOption('forceNoDuplicateChecking', $pa_options, true)) {
-				// VHH - BUGFIX START
-				// See MMSI-969: Search index not updated when adding new meta data elements
-				// $vn_element_id is used again which corrupts the registration of the element id in _FIELD_VALUE_CHANGED
-				// Changed $vn_element_id to $vn_sub_element_id
-				if (caGetOption('skipExistingValues', $pa_options, false) || !caGetOption('allowDuplicateValues', $element_info, false)) {
-					// filter out any values that already exist on this row
-					if(is_array($va_attrs = $this->getAttributesByElement($pm_element_code_or_id))) {
-						$vb_already_exists = false;
-						foreach($va_attrs as $o_attr) {
-							foreach($o_attr->getValues() as $o_value) {
-								$vn_sub_element_id = $o_value->getElementID();
-								$vs_element_code = ca_metadata_elements::getElementCodeForId($vn_sub_element_id);
-								$pv = $o_value->getDisplayValue();
-								if (!empty($pa_values[$vs_element_code]) && ($pa_values[$vs_element_code] == $pv)) {
-									$vb_already_exists = true;
-								} else if (!empty($pa_values[$vn_sub_element_id]) && ($pa_values[$vn_sub_element_id] == $pv)) {
-									$vb_already_exists = true;
-								}
-							}
-							if ($vb_already_exists) {
-								return null;
-							}
-						}
-					}
-				}
-				// VHH - BUGFIX END
+			// VHH - BUGFIX START
+			// See MMSI-969: Search index not updated when adding new meta data elements
+			// $vn_element_id is used again which corrupts the registration of the element id in _FIELD_VALUE_CHANGED
+			// Changed $vn_element_id to $vn_sub_element_id
+			if (caGetOption('skipExistingValues', $pa_options, false)) {
+			    // filter out any values that already exist on this row
+			    if(is_array($va_attrs = $this->getAttributesByElement($pm_element_code_or_id))) {
+			        $vb_already_exists = false;
+			        foreach($va_attrs as $o_attr) {
+			            foreach($o_attr->getValues() as $o_value) {
+			                $vn_sub_element_id = $o_value->getElementID();
+			                $vs_element_code = ca_metadata_elements::getElementCodeForId($vn_sub_element_id);
+			                if ($pa_values[$vs_element_code] && ($pa_values[$vs_element_code] != $o_value->getDisplayValue())) {
+			                    continue(2);
+			                }
+			            }
+			            $vb_already_exists = true;
+			            break;
+			        }
+			        if ($vb_already_exists) {
+			            return null;
+			        }
+			    }
 			}
+			// VHH - BUGFIX END
 			
 			$this->opa_attributes_to_add[] = array(
 				'values' => $pa_values,
