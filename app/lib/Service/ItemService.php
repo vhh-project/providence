@@ -237,7 +237,7 @@ class ItemService extends BaseJSONService {
 		
 		$o_service_config = Configuration::load(__CA_APP_DIR__."/conf/services.conf");
 		$va_versions = $o_service_config->get('item_service_media_versions');
-		if(!is_array($va_versions) || !sizeof($va_versions)) { $va_versions = ['preview170','original']; }
+		if(!is_array($va_versions) || !sizeof($va_versions)) { $va_versions = ['preview170','large','original']; }
 
 		$t_list = new ca_lists();
 		$t_locales = new ca_locales();
@@ -423,7 +423,7 @@ class ItemService extends BaseJSONService {
 		$o_service_config = Configuration::load(__CA_APP_DIR__."/conf/services.conf");
 		$va_versions = $o_service_config->get('item_service_media_versions');
 		if(!is_array($va_versions) || !sizeof($va_versions)) {
-			$va_versions = ['preview170','original'];
+			$va_versions = ['preview170','large','original'];
 		}
 
 		// allow user-defined template to be passed; allows flexible formatting of returned "display" value
@@ -1353,7 +1353,7 @@ class ItemService extends BaseJSONService {
 		$o_service_config = Configuration::load(__CA_APP_DIR__."/conf/services.conf");
 		$va_versions = $o_service_config->get('item_service_media_versions');
 		if(!is_array($va_versions) || !sizeof($va_versions)) {
-			$va_versions = ['preview170','original'];
+			$va_versions = ['preview170','large','original'];
 		}
 
 		// Add info on primary representation and delete all other representations that are not primary
