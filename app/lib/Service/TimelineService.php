@@ -1153,6 +1153,63 @@ class TimelineService {
 			}
 		}
 
+		// STEP 5: Find TBA relations
+		// TODO: Fix this
+		foreach ($caOccurrences as &$caOccurrence) {
+			$occurrenceId = $caOccurrence['id'];
+				
+			$query = [
+				'bool' => [
+					'must' => [
+						[
+							'term' => [
+								'rightValue' => $occurrenceId
+							]
+						],
+						[
+							'term' => [
+								'rightType' => 'ca_occurrence'
+							]
+						],
+						[
+							'term' => [
+								'isPublic' => true
+							]
+						],
+						[
+							'term' => [
+								'isPublished' => true
+							]
+						]
+					]
+				]
+			];
+
+			$esResponse = TimelineService::fetchRelTBAs($query);
+
+			if (!empty($esResponse['hits']) && ($esResponse['hits']['total']['value'] > 0)) {
+				$caOccurrence['tbas'] = [];
+
+				foreach($esResponse['hits']['hits'] as $hit) {
+					$eventId = $hit['_source']['rightValue'];					
+					$caOccurrence['tbas'] []= [
+						'id' => $hit['_id'],
+						'videoId' => $hit['_source']['leftValue'],
+						'inPoint' => $hit['_source']['leftStart'],
+						'outPoint' => $hit['_source']['leftEnd'],
+						'label' => $hit['_source']['leftLabel'],
+						'eventId' => $eventId,
+						'createdByUserId' => $hit['_source']['createdByUserId'],
+						'createdByUserName' => $hit['_source']['createdByUserName'],
+						'createdAt' => $hit['_source']['createdAt'],
+						'lastModifiedByUserId' => $hit['_source']['createdByUserId'],
+						'lastModifiedByUserName' => $hit['_source']['createdByUserName'],
+						'lastModifiedAt' => $hit['_source']['createdAt']
+					];
+				}
+			}
+		}
+
 		$response = [
 			'events' => $caOccurrences,
 			'placesByPlaceId' => $caPlacesByPlaceId
