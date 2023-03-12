@@ -26,6 +26,10 @@ class TimelineService {
 				return TimelineService::getHistoricEvents($force_refresh, $path);
 				break;
 
+			case 'vocterms':
+				return TimelineService::getVocTerms();
+				break;
+
 			default:
 				return array('error' => 'Wrong timeline data type: '.$ps_timeline_type);
 		}
@@ -1218,6 +1222,33 @@ class TimelineService {
 		file_put_contents($file_path, json_encode($response));
 		
 		return ['response' => $response];
+	}
+
+	private static function getVocTerms() {
+		$vocTerms = [];
+		$db = new Db();
+
+		$sql = 'SELECT element_id FROM ca_metadata_elements WHERE element_code = "vhh_VocTerm_Path" LIMIT 1';
+		$dbResult = $db->query($sql);
+		
+		while($dbResult->nextRow()) {
+			$row = $dbResult->getRow();
+			$elementId = $row['element_id'];
+		}
+
+		if (empty($elementId)) {
+			return null;
+		}
+
+		$sql = 'SELECT DISTINCT value_longtext1 from ca_attribute_values WHERE element_id = "'.$elementId.'" LIMIT 1000';
+		$dbResult = $db->query($sql);
+
+		while($dbResult->nextRow()) {
+			$row = $dbResult->getRow();
+			$vocTerms []= $row['value_longtext1'];
+		}
+		
+		return ['response' => $vocTerms];
 	}
 }
 
