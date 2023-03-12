@@ -1240,12 +1240,15 @@ class TimelineService {
 			return null;
 		}
 
-		$sql = 'SELECT DISTINCT value_longtext1 from ca_attribute_values WHERE element_id = "'.$elementId.'" LIMIT 1000';
+		$sql = 'SELECT value_longtext1, count(*) as `count` from ca_attribute_values WHERE element_id = "'.$elementId.'" GROUP BY value_longtext1 LIMIT 1000';
 		$dbResult = $db->query($sql);
 
 		while($dbResult->nextRow()) {
 			$row = $dbResult->getRow();
-			$vocTerms []= $row['value_longtext1'];
+			$vocTerms []= array(
+				'value' => $row['value_longtext1'],
+				'count' => $row['count']
+			);
 		}
 		
 		return ['response' => $vocTerms];
