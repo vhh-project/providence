@@ -641,11 +641,11 @@ class TimelineService {
 
 			if (!empty($item)) {
 				if (!empty($item['creation'])) {
-					$dateTBA['label'] = $item['creation']['label'];
+					$dateTBA['label'] = $item['creation']['idno'].': '.$item['creation']['label'];
 				} else if (!empty($item['manifestation'])) {
-					$dateTBA['label'] = $item['manifestation']['label'];
+					$dateTBA['label'] = $item['manifestation']['idno'].': '.$item['manifestation']['label'];
 				} else {
-					$dateTBA['label'] = $item['label'];
+					$dateTBA['label'] = $item['idno'].': '.$item['label'];
 				}
 			}
 		}
