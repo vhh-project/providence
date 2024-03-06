@@ -147,12 +147,14 @@ class TimelineService {
 		// Fetch Creation Object
 		$manifestationRow = null;
 		$db = new Db();
+
+    $typeId = TimelineService::getTypeIdForTypeCode("IsItemOfAV");
 		
 		// Try to fetch AV Manifestation
 		$sql = 'SELECT * FROM ca_objects_x_objects ';
 		$sql .= 'WHERE (ca_objects_x_objects.object_left_id = "'.$result['id'].'" '; 
 		$sql .= 'OR ca_objects_x_objects.object_right_id = "'.$result['id'].'") '; 
-		$sql .= 'AND ca_objects_x_objects.type_id = "368" '; // AV Manifestation
+		$sql .= 'AND ca_objects_x_objects.type_id = "'.$typeId.'" '; // AV Manifestation
 		$sql .= 'LIMIT 1;';
 
 		$dbResult = $db->query($sql);
@@ -187,11 +189,13 @@ class TimelineService {
 
 		// Try to fetch AV Creation
 		$creationRow = null;
+
+    $typeId = TimelineService::getTypeIdForTypeCode("IsManifestationOfAV");
 		
 		$sql = 'SELECT * FROM ca_objects_x_objects ';
 		$sql .= 'WHERE (ca_objects_x_objects.object_left_id = "'.$manifestationId.'" '; 
 		$sql .= 'OR ca_objects_x_objects.object_right_id = "'.$manifestationId.'") '; 
-		$sql .= 'AND ca_objects_x_objects.type_id = "370" '; // AV Creation
+		$sql .= 'AND ca_objects_x_objects.type_id = "'.$typeId.'" '; // AV Creation
 		$sql .= 'LIMIT 1;';
 
 		$dbResult = $db->query($sql);
@@ -227,13 +231,27 @@ class TimelineService {
 		return $result;
 	}
 
+  private static function getTypeIdForTypeCode($typeCode) {
+    $db = new Db();
+
+    $sql = 'SELECT type_id FROM ca_relationship_types WHERE ca_relationship_types.type_code = "'.$typeCode.'" LIMIT 1;';
+    $dbResult = $db->query($sql);
+
+    while ($dbResult->nextRow()) {
+      $row = $dbResult->getRow();
+      return $row['type_id'];
+    }
+
+    return null;
+  }
+
 	private static function fetchItemWithRepresentationForCreation($creationId, $creationType) {
 		$db = new Db();
 		
 		// TODO: nonav type id
-		$typeId = ($creationType == 'av') ? '370' : '371';
-		$subTypeId = ($creationType == 'av') ? '368' : '369';
-		
+		$typeId = TimelineService::getTypeIdForTypeCode(($creationType == 'av') ? 'IsManifestationOfAV' : 'IsManifestationOfNonAV');
+		$subTypeId = TimelineService::getTypeIdForTypeCode(($creationType == 'av') ? 'IsItemOfAV' : 'IsItemOfNonAV');
+
 		// Try to fetch AV Manifestation
 		$sql = 'SELECT object_left_id, object_right_id FROM ca_objects_x_objects ';
 		$sql .= 'WHERE (ca_objects_x_objects.object_left_id = "'.$creationId.'" '; 
