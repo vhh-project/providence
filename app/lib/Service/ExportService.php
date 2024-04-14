@@ -7,17 +7,26 @@ set_time_limit(3600);
 
 class ExportService
 {
-  public static function dispatchNonAv($ps_query, $vb_collect_images, $vb_collect_meta)
+  public static $CREATION_NONAV_TYPE_ID = "28";
+  public static $CREATION_AV_TYPE_ID = "25";
+  public static $EXPORT_LIMIT = 100000;
+  public static $SERVER_BASE_URL = "https://ca.vhh-dev.max-recall.com/";
+  public static function dispatchNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json)
   {
-    return ExportService::processNonAv($ps_query, $vb_collect_images, $vb_collect_meta);
+    return ExportService::processNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json);
   }
 
-  public static function dispatchFlat($ps_object_type, $ps_query)
+  public static function dispatchAv($ps_query, $vb_show_json)
   {
-    return ExportService::processFlat($ps_object_type, $ps_query);
+    return ExportService::processAv($ps_query, $vb_show_json);
   }
 
-  private static function processNonAv($ps_query, $vb_collect_images, $vb_collect_meta)
+  public static function dispatchFlat($ps_object_type, $ps_query, $vb_show_json)
+  {
+    return ExportService::processFlat($ps_object_type, $ps_query, $vb_show_json);
+  }
+
+  private static function processNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json)
   {
     $startTime = microtime(true);
     $response = [];
@@ -33,10 +42,10 @@ class ExportService
 
     // STEP 1: Search for all NonAVCreations and their manifestations, items and representations, entities, places, occurrences, collections
 
-    $searchResult = $caObjectSearch->search('ca_objects.type_id:28 AND (' . $ps_query . ')', [
+    $searchResult = $caObjectSearch->search('ca_objects.type_id:'.ExportService::$CREATION_NONAV_TYPE_ID.' AND (' . $ps_query . ')', [
       'sort' => 'object_id',
       'sortDirection' => 'asc',
-      'limit' => 5000
+      'limit' => ExportService::$EXPORT_LIMIT
     ]);
 
     $rows = [];
@@ -71,7 +80,7 @@ class ExportService
       }
 
       if ($creation) {
-        $subItems = ExportService::fetchRepresentationPath($creationId, $vb_collect_meta);
+        $subItems = ExportService::fetchRepresentationPath($creationId, $vb_collect_meta, true);
         $row['subItems'] = $subItems;
       }
 
@@ -157,14 +166,112 @@ class ExportService
 
     $response['execution_time_seconds'] = microtime(true) - $startTime;
     $response['creations'] = count($rows);
-    // $response['rows'] = $rows;
+
+    if ($vb_show_json) {
+      $response['rows'] = $rows;
+    }
 
     return [
       'response' => $response
     ];
   }
 
-  private static function processFlat($objectType, $query)
+  private static function processAv($ps_query, $vb_show_json)
+  {
+    // https://ca.vhh-dev.max-recall.com/providence/service.php/export/ca_objects?query=ca_objects.preferred_labels.name:(Test)&type=av&show_json=1
+    $startTime = microtime(true);
+    $response = [];
+    $uniqueId = uniqid();
+
+    $path = __CA_BASE_DIR__ . '/media/mmsi/export/' . $uniqueId . '/';
+    mkdir($path, 0775, true);
+
+    if (!($caObjectSearch = caGetSearchInstance('ca_objects'))) {
+      return array('error' => 'Could not get search instance for ca_objects');
+    }
+
+     // STEP 1: Search for all NonAVCreations and their manifestations, items and representations, entities, places, occurrences, collections
+
+    $searchResult = $caObjectSearch->search('ca_objects.type_id:'.ExportService::$CREATION_AV_TYPE_ID.' AND (' . $ps_query . ')', [
+      'sort' => 'object_id',
+      'sortDirection' => 'asc',
+      'limit' => ExportService::$EXPORT_LIMIT
+    ]);
+
+    $rows = [];
+
+    $caEntitiesById = [];
+    $caPlacesById = [];
+    $caOccurrencesById = [];
+    $caCollectionsById = [];
+
+    while ($searchResult->nextHit()) {
+      $creationId = $searchResult->get('object_id');
+      $creation = new ca_objects($creationId);
+
+      $row = [
+        'id' => $creationId,
+        'idno' => $searchResult->get('idno'),
+        'preferred_label' => $searchResult->get('ca_objects.preferred_labels.name')
+      ];
+
+      $attributes = ExportService::getAllAttributes($creation, 'ca_objects');
+      $entityRelations = ExportService::getRelations($creationId, 'entities', 'entity_id', 'entity_id', $caEntitiesById);
+      $placeRelations = ExportService::getRelations($creationId, 'places', 'place_id', 'place_id', $caPlacesById);
+      $occurrenceRelations = ExportService::getRelations($creationId, 'occurrences', 'occurrence_id', 'occurrence_id', $caOccurrencesById);
+      $collectionRelations = ExportService::getRelations($creationId, 'collections', 'collection_id', 'collection_id', $caCollectionsById);
+
+      $row['attributes'] = $attributes;
+      $row['entities'] = $entityRelations;
+      $row['places'] = $placeRelations;
+      $row['occurrences'] = $occurrenceRelations;
+      $row['collections'] = $collectionRelations;
+
+      $subItems = ExportService::fetchRepresentationPath($creationId, true, false);
+      $row['subItems'] = $subItems;
+
+      $rows[] = $row;
+    }
+
+    // STEP 2: Create Main CSV and other CSVs
+    ExportService::writeCsv($path . 'main.csv', ExportService::createMainCsvData($rows));
+
+    // Step 3: Create other CSVs
+    ExportService::writeCsv($path . 'agents.csv', ExportService::createRelCsvData($caEntitiesById, 'agent'));
+    ExportService::writeCsv($path . 'places.csv', ExportService::createRelCsvData($caPlacesById, 'place'));
+    ExportService::writeCsv($path . 'events.csv', ExportService::createRelCsvData($caOccurrencesById, 'event'));
+    ExportService::writeCsv($path . 'collections.csv', ExportService::createRelCsvData($caCollectionsById, 'collection'));
+
+    $zipFilename = $path . 'metadata.zip';
+    $zip = new ZipArchive;
+
+    if ($zip->open($zipFilename, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+      $zip->addEmptyDir('metadata');
+      $zip->addFile($path . 'main.csv', 'metadata/' . 'main.csv');
+      $zip->addFile($path . 'agents.csv', 'metadata/' . 'agents.csv');
+      $zip->addFile($path . 'places.csv', 'metadata/' . 'places.csv');
+      $zip->addFile($path . 'events.csv', 'metadata/' . 'events.csv');
+      $zip->addFile($path . 'collections.csv', 'metadata/' . 'collections.csv');
+      $zip->close();
+    }
+
+    $response['metadata_zip'] = "/media/mmsi/export/$uniqueId/metadata.zip";
+
+    $response['execution_time_seconds'] = microtime(true) - $startTime;
+    $response['creations'] = count($rows);
+    
+    if ($vb_show_json) {
+      $response['rows'] = $rows;
+    }
+
+    $response['server'] = 'https://'.$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF'];
+
+    return [
+      'response' => $response
+    ];
+  }
+
+  private static function processFlat($objectType, $query, $showJson)
   {
     $startTime = microtime(true);
     $response = [];
@@ -199,7 +306,7 @@ class ExportService
     $searchResult = $caObjectSearch->search($query, [
       'sort' => $typeInfo['idKey'],
       'sortDirection' => 'asc',
-      'limit' => 5000
+      'limit' => ExportService::$EXPORT_LIMIT
     ]);
 
     $rows = [];
@@ -232,15 +339,16 @@ class ExportService
       $zip->close();
     }
 
+    $response['execution_time_seconds'] = microtime(true) - $startTime;
+    $repsonse['count'] = count($rows);
     $response['metadata_zip'] = "/media/mmsi/export/$uniqueId/metadata.zip";
+    
+    if ($showJson) {
+      $repsonse['count'] = count($rows);
+    }
 
     return [
-      'response' => [
-        'execution_time_seconds' => microtime(true) - $startTime,
-        'count' => count($rows),
-        'metadata_zip' => "/media/mmsi/export/$uniqueId/metadata.zip",
-        'rows' => $rows
-      ]
+      'response' => $response
     ];
   }
 
@@ -258,11 +366,11 @@ class ExportService
     return null;
   }
 
-  private static function fetchRepresentationPath($creationId, $collectMeta)
+  private static function fetchRepresentationPath($creationId, $collectMeta, $isNonAv)
   {
     $result = ['other_manifestations' => []];
     $db = new Db();
-    $typeId = ExportService::getTypeIdForTypeCode('IsManifestationOfNonAV');
+    $typeId = ExportService::getTypeIdForTypeCode($isNonAv ? 'IsManifestationOfNonAV' : 'IsManifestationOfAV');
 
     // Try to fetch AV Manifestation
     $sql = 'SELECT ca_objects_x_objects.object_left_id AS object_left_id, ca_objects_x_objects.object_right_id AS object_right_id, ca_relationship_types.type_code AS type_code ';
@@ -271,7 +379,7 @@ class ExportService
     $sql .= 'INNER JOIN ca_relationship_types ON ca_relationship_types.type_id = ca_objects_x_objects.type_id ';
     $sql .= 'WHERE (ca_objects_x_objects.object_left_id = "' . $creationId . '" ';
     $sql .= 'OR ca_objects_x_objects.object_right_id = "' . $creationId . '") ';
-    $sql .= 'AND ca_objects_x_objects.type_id = "' . $typeId . '" '; // has NonAV Manifestation
+    $sql .= 'AND ca_objects_x_objects.type_id = "' . $typeId . '" '; // has AV/NonAV Manifestation
     $sql .= 'LIMIT 100;';
 
     $dbResult = $db->query($sql);
@@ -282,7 +390,7 @@ class ExportService
       $manifestation = new ca_objects($manifestationId);
 
       if ($manifestation) {
-        $dataObject = ExportService::getItemAndRepresentation($manifestationId, $collectMeta);
+        $dataObject = ExportService::getItemAndRepresentation($manifestationId, $collectMeta, $isNonAv);
 
         if ($dataObject) {
           $result['manifestation'] = [
@@ -310,9 +418,9 @@ class ExportService
     return $result;
   }
 
-  private static function getItemAndRepresentation($manifestationId, $collectMeta)
+  private static function getItemAndRepresentation($manifestationId, $collectMeta, $isNonAv)
   {
-    $subTypeId = ExportService::getTypeIdForTypeCode('IsItemOfNonAV');
+    $subTypeId = ExportService::getTypeIdForTypeCode($isNonAv ? 'IsItemOfNonAV' : 'IsItemOfAV');
     $db = new Db();
 
     $subSql = 'SELECT object_left_id, object_right_id, type_id FROM ca_objects_x_objects ';
@@ -327,21 +435,21 @@ class ExportService
       $subRow = $subDbResult->getRow();
       $itemId = ($subRow['object_left_id'] == $manifestationId) ? $subRow['object_right_id'] : $subRow['object_left_id'];
 
-      $repSql = 'SELECT representation_id FROM ca_objects_x_object_representations ';
-      $repSql .= 'WHERE ca_objects_x_object_representations.object_id = "' . $itemId . '" ';
-      $repSql .= 'AND ca_objects_x_object_representations.is_primary = "1" ';
-      $repSql .= 'LIMIT 1;';
+      $repRelSql = 'SELECT representation_id FROM ca_objects_x_object_representations ';
+      $repRelSql .= 'WHERE ca_objects_x_object_representations.object_id = "' . $itemId . '" ';
+      $repRelSql .= 'AND ca_objects_x_object_representations.is_primary = "1" ';
+      $repRelSql .= 'LIMIT 1;';
 
-      $repDbResult = $db->query($repSql);
+      $repRelDbResult = $db->query($repRelSql);
 
-      while ($repDbResult->nextRow()) {
-        $repRow = $repDbResult->getRow();
-        $representationId = $repRow['representation_id'];
+      while ($repRelDbResult->nextRow()) {
+        $repRelRow = $repRelDbResult->getRow();
+        $representationId = $repRelRow['representation_id'];
 
         $representation = new ca_object_representations($representationId);
         $mimeType = $representation->get('mimetype');
-
-        if (strpos($mimeType, 'image/') == 0) {
+        
+        if (!empty($mimeType) && (($isNonAv && strpos($mimeType, 'image/') == 0) || (!$isNonAv && strpos($mimeType, 'video/') == 0))) {
           $item = new ca_objects($itemId);
           $media = $representation->getRepresentations(['original']);
 
@@ -358,9 +466,11 @@ class ExportService
                 'attributes' => $collectMeta ? ExportService::getAllAttributes($item, 'ca_objects') : null
               ],
               'representation' => [
-                'id' => $representation->get('representation_id'),
+                'mimetype' => $mimeType,
+                'id' => $representationId,
                 'access' => $representation->get('access'),
-                'path' => $path
+                'path' => $path,
+                'url' => ExportService::$SERVER_BASE_URL.str_replace('/var/www/html', '', $path)
               ]
             ];
           }
@@ -545,7 +655,7 @@ class ExportService
     ksort($manifestationAttrKeys);
     ksort($itemAttrKeys);
 
-    foreach ($otherManifestationsAttrKeys as &$$otherManifestationsAttrKeysItem) {
+    foreach ($otherManifestationsAttrKeys as &$otherManifestationsAttrKeysItem) {
       ksort($otherManifestationsAttrKeysItem);
     }
 
@@ -589,6 +699,7 @@ class ExportService
 
     $header[] = 'item.representation_id';
     $header[] = 'item.accessible_to_public';
+    $header[] = 'representation.url';
 
     // Add Headers - Other Mannifestations
     if (count($otherManifestationsAttrKeys) > 0) {
@@ -648,7 +759,9 @@ class ExportService
       if (!empty($row['subItems']['representation'])) {
         $rowData[] = $row['subItems']['representation']['id'];
         $rowData[] = $row['subItems']['representation']['access'];
+        $rowData[] = $row['subItems']['representation']['url'];
       } else {
+        $rowData[] = '';
         $rowData[] = '';
         $rowData[] = '';
       }
