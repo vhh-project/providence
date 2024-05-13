@@ -38,6 +38,8 @@ require_once(__CA_LIB_DIR__."/Service/BaseJSONService.php");
 require_once(__CA_MODELS_DIR__."/ca_lists.php");
 
 class ItemService extends BaseJSONService {
+  public $ENTITY_REPRESENTATION_CREATOR_TYPE_ID = "23";
+
 	# -------------------------------------------------------
 	public function __construct($po_request, $ps_table="") {
 		parent::__construct($po_request, $ps_table);
@@ -1328,16 +1330,24 @@ class ItemService extends BaseJSONService {
 			return false;
 		}
 
+    $va_options = [
+      'original_filename' => $_FILES['thumb']['name']
+    ];
+
+    if ($ps_table === "ca_entities") {
+      $va_options["type_id"] = $this->ENTITY_REPRESENTATION_CREATOR_TYPE_ID;
+    }
+
 		// Create new primary Representation
 		$t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
-			caGetOption('type', $va_rep, 'thumbnail'), // thumbnail seems to be a custom type in VHH
+      caGetOption('type', [], 'thumbnail'), // thumbnail seems to be a custom type in VHH
 			ca_locales::getDefaultCataloguingLocaleID(),
 			0,				// Status
 			1,				// Access Status
 			true,			// Primary
 			null,			// values
-			array('original_filename' => $_FILES['thumb']['name']) // options
+			$va_options
 		);
 
 		if($t_instance->numErrors()>0) {
