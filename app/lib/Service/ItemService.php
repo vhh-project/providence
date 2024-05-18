@@ -1334,7 +1334,7 @@ class ItemService extends BaseJSONService {
       'original_filename' => $_FILES['thumb']['name']
     ];
 
-    if ($ps_table === "ca_entities") {
+    if ($ps_table !== "ca_objecs") {
       $va_options["type_id"] = $this->ENTITY_REPRESENTATION_CREATOR_TYPE_ID;
     }
 
