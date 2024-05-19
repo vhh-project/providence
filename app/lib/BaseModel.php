@@ -2201,9 +2201,9 @@ class BaseModel extends BaseObject {
 				$msg = $e->getMessage();
 				if (preg_match("!FOREIGN KEY \([`]*([A-Za-z0-9_]+)!", $msg, $m)) {
 					if ($m[1] === 'type_id') {
-						$msg = _t('Invalid relationship type');
+						$msg = _t('Invalid relationship type. Message: '.$msg);
 					} else {
-						$msg = _t('Invalid relationship reference for %1', $m[1]);
+						$msg = _t('Invalid relationship reference for %1. Message: '.$msg, $m[1]);
 					}
 				}
 				$this->postError($e->getNumber(), $msg, $e->getContext());
