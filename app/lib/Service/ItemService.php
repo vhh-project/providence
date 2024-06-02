@@ -1338,6 +1338,14 @@ class ItemService extends BaseJSONService {
       $va_options["type_id"] = $this->ENTITY_REPRESENTATION_CREATOR_TYPE_ID;
     }
 
+    $values = null;
+
+    if (!empty($_POST['name'])) {
+      $values = [
+        "name" => $_POST['name']
+      ];
+    }
+
 		// Create new primary Representation
 		$t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
@@ -1346,7 +1354,7 @@ class ItemService extends BaseJSONService {
 			0,				// Status
 			1,				// Access Status
 			true,			// Primary
-			null,			// values
+			$values,	// values
 			$va_options
 		);
 
