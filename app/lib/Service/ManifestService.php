@@ -34,7 +34,7 @@ class ManifestService extends BaseJSONService {
 				0 => 'http://iiif.io/api/presentation/2/context.json'
 			),
 			'@type' => 'sc:Manifest',
-			'logo' => $vs_host.'/mmsi/images/vhh-logo.png',
+			'logo' => $vs_host.'/mmsi/images/logo-manifest.png',
 			'service' => array()
 		);
 		
@@ -64,7 +64,12 @@ class ManifestService extends BaseJSONService {
 			foreach($va_labels as $vn_locale_id => $va_labels_by_locale) {
 				foreach($va_labels_by_locale as $va_tmp) {
 					foreach($t_instance->getLabelUIFields() as $vs_label_fld) {
-						array_push($va_metadata, array('label' => 'Preferred Label', 'value' => $va_tmp[$vs_label_fld]));
+            if ($vs_label_fld === 'name' || $vs_label_fld === 'displayname') {
+              $vs_field_value = $va_tmp[$vs_label_fld];
+              if (!empty($vs_field_value)) {
+                array_push($va_metadata, array('label' => 'Preferred Label', 'value' => $vs_field_value));
+              }
+            }
 					}
 				}
 			}
@@ -98,8 +103,34 @@ class ManifestService extends BaseJSONService {
 						$vs_original_url = str_replace(array('http://ca/providence', 'https://ca/providence'), $vs_host.'/mmsi/api/ca', $vs_original_url);
 						$va_return['@id'] = $vs_original_url;
 
+            if (!empty($va_allowed_rep['label']) && $va_allowed_rep['label'] !== '[BLANK]') {
+              array_push($va_return['metadata'], array('label' => 'Image Title', 'value' => $va_allowed_rep['label']));
+            }
+            
+            if (!empty($va_allowed_rep['info']['original_filename'])) {
+              array_push($va_return['metadata'], array('label' => 'Original Filename', 'value' => $va_allowed_rep['info']['original_filename']));
+            }
+
+            if (!empty($va_allowed_rep['media_metadata'])) {
+              $va_media_metadata = caUnserializeForDatabase($va_allowed_rep['media_metadata']);
+
+              if (!empty($va_media_metadata['IPTC'])) {
+                foreach($va_media_metadata['IPTC'] as $vs_iptc_key => $vs_iptc_value) {
+                  $vs_iptc_value = trim($vs_iptc_value);
+
+                  if (!empty($vs_iptc_value)) {
+                    if (!mb_check_encoding($vs_iptc_value, 'utf-8')) {
+                      $vs_iptc_value = @iconv('ISO-8859-1', 'UTF-8', $vs_iptc_value);
+                    }
+
+                    array_push($va_return['metadata'], array('label' => 'IPTC - '.$vs_iptc_key, 'value' => $vs_iptc_value));
+                  }
+                }
+              }
+            }
+
 						if (!empty($va_allowed_rep['urls']['preview170'])) {
-							$vs_thumb_url = $va_allowed_rep['urls']['preview170'];
+							$vs_thumb_url = $va_allowed_rep['urls']['preview170']; 
 							$vs_thumb_url = str_replace(array('http://ca/providence', 'https://ca/providence'), $vs_host.'/mmsi/api/ca', $vs_thumb_url);
 							$va_return['thumbnail'] = array(
 								'@id' => $vs_thumb_url,
@@ -128,7 +159,7 @@ class ManifestService extends BaseJSONService {
 							$vn_width = intval($va_allowed_rep['info']['original']['WIDTH']);
 							$vn_height = intval($va_allowed_rep['info']['original']['HEIGHT']);
 					
-							$va_return['items'] = array(
+              $va_return['items'] = array(
 								0 => array(
 									'id' => $vs_iiif_url,
 									'type' => 'Canvas',
@@ -168,7 +199,6 @@ class ManifestService extends BaseJSONService {
 				}
 			}
 		}
-
 		return $va_return;
 	}
 }
