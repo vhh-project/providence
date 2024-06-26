@@ -127,7 +127,13 @@ class SearchJSONService extends BaseJSONService {
 			$va_item = array();
 
 			$va_item[$t_instance->primaryKey()] = $vn_id = $vo_result->get($t_instance->primaryKey());
-			$va_item['id'] = $vn_id;
+      
+      $vn_add_all_media = $this->opo_request->getParameter('add_all_media', pInteger, 'GET');
+      if ($vn_add_all_media == 1) {
+        $va_item['all_media'] = $this->getAllMediaInfo($vn_id);
+      }
+
+      $va_item['id'] = $vn_id;
 			if($vs_idno = $vo_result->get("idno")) {
 				$va_item["idno"] = $vs_idno;
 			}
@@ -152,7 +158,7 @@ class SearchJSONService extends BaseJSONService {
 					// it should provide a means to get the media info array
 					if(trim($vs_bundle) == 'ca_object_representations.media') {
 						if($t_instance instanceof RepresentableBaseModel) {
-							if ($vs_rep_version = $o_service_config->get('search_service_return_media_version_as_url')) {
+              if ($vs_rep_version = $o_service_config->get('search_service_return_media_version_as_url')) {
 								$va_object_ids = $vo_result->get('ca_objects.object_id', ['returnAsArray' => true]);
 								if (sizeof($va_object_ids)) {
 									if ($qr_objects = caMakeSearchResult('ca_objects', $va_object_ids)) {
@@ -194,4 +200,50 @@ class SearchJSONService extends BaseJSONService {
 		return $va_return;
 	}
 	# -------------------------------------------------------
+
+  // VHH: Added this to enhance thumbnail capabilities for the MMSI
+  function getAllMediaInfo($vn_id) {
+    if ($this->ops_table == 'ca_objects') {
+      $vs_rel_table = 'ca_objects_x_object_representations';
+    } else {
+      $vs_rel_table = 'ca_object_representations_x_'.substr($this->ops_table, 3);
+    }
+
+    switch ($this->ops_table) {
+      case 'ca_objects':
+        $vs_rel_id_key = 'object_id';
+        break;
+      case 'ca_entities':
+        $vs_rel_id_key = 'entity_id';
+        break;
+      case 'ca_places':
+        $vs_rel_id_key = 'place_id';
+        break;
+      case 'ca_occurrences':
+        $vs_rel_id_key = 'occurrence_id';
+        break;
+      case 'ca_collections':
+        $vs_rel_id_key = 'collection_id';
+        break;
+    }
+    
+    $o_db = new Db();
+    $vs_sql = "SELECT rel.representation_id, rel.is_primary FROM $vs_rel_table AS rel WHERE rel.$vs_rel_id_key = \"$vn_id\";";
+    $qr_res = $o_db->query($vs_sql);
+
+    $result = [];
+
+    while($qr_res->nextRow()) {
+      $row = $qr_res->getRow();
+      $t_instance = new ca_object_representations($row['representation_id']);
+
+      if ($t_instance) {
+        $row['media'] = $t_instance->getMediaInfo('media');
+        $row['type_id'] = $t_instance->getTypeId();
+      }
+
+      $result[] = $row;
+    }
+    return $result;
+  }
 }

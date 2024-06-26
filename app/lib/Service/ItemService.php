@@ -39,6 +39,7 @@ require_once(__CA_MODELS_DIR__."/ca_lists.php");
 
 class ItemService extends BaseJSONService {
   public $ENTITY_REPRESENTATION_CREATOR_TYPE_ID = "23";
+  public $THUMBNAIL_TYPE_ID = "145";
 
 	# -------------------------------------------------------
 	public function __construct($po_request, $ps_table="") {
@@ -1331,7 +1332,8 @@ class ItemService extends BaseJSONService {
 		}
 
     $va_options = [
-      'original_filename' => $_FILES['thumb']['name']
+      'original_filename' => $_FILES['thumb']['name'],
+      'returnRepresentation' => true
     ];
 
     if ($ps_table !== "ca_objecs") {
@@ -1347,13 +1349,13 @@ class ItemService extends BaseJSONService {
     }
 
 		// Create new primary Representation
-		$t_instance->addRepresentation(
+		$t_rep = $t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
       caGetOption('type', [], 'thumbnail'), // thumbnail seems to be a custom type in VHH
 			ca_locales::getDefaultCataloguingLocaleID(),
 			0,				// Status
 			1,				// Access Status
-			true,			// Primary
+			false,			// Primary
 			$values,	// values
 			$va_options
 		);
@@ -1365,6 +1367,10 @@ class ItemService extends BaseJSONService {
 			return false;
 		}
 
+    if (empty($t_rep)) {
+      return false;
+    }
+
 		$va_removed_ids = array();
 		$va_new_info = array();
 
@@ -1374,14 +1380,18 @@ class ItemService extends BaseJSONService {
 			$va_versions = ['preview170','large','original'];
 		}
 
-		// Add info on primary representation and delete all other representations that are not primary
+		// Add info on thumbnail representation and delete all other thumbnail representations
 		if (is_array($va_reps = $t_instance->getRepresentations($va_versions))) {
 			foreach ($va_reps as $vn_i => $va_rep_info) {
-				if ($va_rep_info['is_primary'] == '1') {
-					$va_new_info = $va_rep_info;
-				} else {
-					$t_instance->removeRepresentation($va_rep_info['representation_id']);
-					$va_removed_ids[] = $va_rep_info['representation_id'];
+				if ($va_rep_info['type_id'] == $this->THUMBNAIL_TYPE_ID) {
+          // return array('type_id' => $this->THUMBNAIL_TYPE_ID, 'id' => ''.$t_rep->getPrimaryKey(), 'info_id' => $va_rep_info['representation_id']);
+          if ($va_rep_info['representation_id'] == ''.$t_rep->getPrimaryKey())
+          {
+            $va_new_info = $va_rep_info;
+          } else {
+            $t_instance->removeRepresentation($va_rep_info['representation_id']);
+            $va_removed_ids[] = $va_rep_info['representation_id'];
+          }
 				}
 			}
 		}
@@ -1402,7 +1412,7 @@ class ItemService extends BaseJSONService {
 		// Add info on primary representation and delete all other representations that are not primary
 		if (is_array($va_reps = $t_instance->getRepresentations($va_versions))) {
 			foreach ($va_reps as $vn_i => $va_rep_info) {
-				if ($va_rep_info['is_primary'] == '1') {
+        if ($va_rep_info['type_id'] == $this->THUMBNAIL_TYPE_ID) {
 					$vs_removed_id = $va_rep_info['representation_id'];
 					$t_instance->removeRepresentation($va_rep_info['representation_id']);
 				}
