@@ -1348,7 +1348,7 @@ class ItemService extends BaseJSONService {
       ];
     }
 
-		// Create new primary Representation
+		// Create new secondary Representation
 		$t_rep = $t_instance->addRepresentation(
 			$_FILES['thumb']['tmp_name'],
       caGetOption('type', [], 'thumbnail'), // thumbnail seems to be a custom type in VHH
@@ -1384,7 +1384,6 @@ class ItemService extends BaseJSONService {
 		if (is_array($va_reps = $t_instance->getRepresentations($va_versions))) {
 			foreach ($va_reps as $vn_i => $va_rep_info) {
 				if ($va_rep_info['type_id'] == $this->THUMBNAIL_TYPE_ID) {
-          // return array('type_id' => $this->THUMBNAIL_TYPE_ID, 'id' => ''.$t_rep->getPrimaryKey(), 'info_id' => $va_rep_info['representation_id']);
           if ($va_rep_info['representation_id'] == ''.$t_rep->getPrimaryKey())
           {
             $va_new_info = $va_rep_info;
