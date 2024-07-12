@@ -53,7 +53,9 @@ class ExportController extends BaseServiceController {
         return;
       }
 
-      $va_content = ExportService::dispatchFlat($ps_object_type, $vs_query, $vb_show_json, $vb_no_zip);
+      $vb_add_agents = $this->opo_request->getParameter("add_agents", pString) == '1';
+
+      $va_content = ExportService::dispatchFlat($ps_object_type, $vs_query, $vb_show_json, $vb_no_zip, $vb_add_agents);
     }
     
     if(intval($this->request->getParameter("pretty", pInteger)) > 0){

@@ -9,21 +9,60 @@ class ExportService
 {
   public static $CREATION_NONAV_TYPE_ID = "28";
   public static $CREATION_AV_TYPE_ID = "25";
+  public static $ITEM_TYPE_ID = "23";
   public static $EXPORT_LIMIT = 100000;
   public static $SERVER_BASE_URL = "https://www.vhh-dev.max-recall.com/mmsi/api/ca/";
   public static function dispatchNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json, $vb_no_zip)
   {
+    ExportService::loadConfig();
     return ExportService::processNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json, $vb_no_zip);
   }
 
   public static function dispatchAv($ps_query, $vb_show_json, $vb_no_zip)
   {
+    ExportService::loadConfig();
     return ExportService::processAv($ps_query, $vb_show_json, $vb_no_zip);
   }
 
-  public static function dispatchFlat($ps_object_type, $ps_query, $vb_show_json, $vb_no_zip)
+  public static function dispatchFlat($ps_object_type, $ps_query, $vb_show_json, $vb_no_zip, $vb_add_agents)
   {
-    return ExportService::processFlat($ps_object_type, $ps_query, $vb_show_json, $vb_no_zip);
+    ExportService::loadConfig();
+    return ExportService::processFlat($ps_object_type, $ps_query, $vb_show_json, $vb_no_zip, $vb_add_agents);
+  }
+
+  public static function loadConfig()
+  {
+    $jsonData = file_get_contents(dirname(__FILE__).'/ExportServiceConfig.json');
+
+    if ($jsonData === false) {
+      return;
+    }
+
+    $json = json_decode($jsonData, true);
+
+    if (json === null) {
+      return;
+    }
+
+    if ($json["creation_av_type_id"]) {
+      ExportService::$CREATION_AV_TYPE_ID = $json["creation_av_type_id"];
+    }
+
+    if ($json["creation_non_av_type_id"]) {
+      ExportService::$CREATION_NONAV_TYPE_ID = $json["creation_non_av_type_id"];
+    }
+
+    if ($json["item_type_id"]) {
+      ExportService::$ITEM_TYPE_ID = $json["item_type_id"];
+    }
+
+    if ($json["export_limit"]) {
+      ExportService::$EXPORT_LIMIT = $json["export_limit"];
+    }
+
+    if ($json["server_base_url"]) {
+      ExportService::$SERVER_BASE_URL = $json["server_base_url"];
+    }
   }
 
   private static function processNonAv($ps_query, $vb_collect_images, $vb_collect_meta, $vb_show_json, $vb_no_zip)
@@ -282,11 +321,13 @@ class ExportService
     ];
   }
 
-  private static function processFlat($objectType, $query, $showJson, $vb_no_zip)
+  private static function processFlat($objectType, $query, $showJson, $vb_no_zip, $vb_add_agents)
   {
     $startTime = microtime(true);
     $response = [];
     $uniqueId = uniqid();
+    $hasRepresenationIds = false;
+    $db = new Db();
 
     $path = __CA_BASE_DIR__ . '/media/mmsi/export/' . $uniqueId . '/';
     mkdir($path, 0775, true);
@@ -333,7 +374,28 @@ class ExportService
 
       $caTableObject = new $typeInfo['classType']($id);
       $row['attributes'] = ExportService::getAllAttributes($caTableObject, $objectType);
-      $row['sub_type'] = $caTableObject->getTypeName($searchResult->get($objectType . '.type_id'));
+
+      $subTypeId = $searchResult->get($objectType . '.type_id');
+      $row['sub_type'] = $caTableObject->getTypeName($subTypeId);
+
+      if ($subTypeId == ExportService::$ITEM_TYPE_ID) {
+        $repRelSql = 'SELECT representation_id FROM ca_objects_x_object_representations ';
+        $repRelSql .= 'WHERE ca_objects_x_object_representations.object_id = "' . $id . '" ';
+        $repRelSql .= 'AND ca_objects_x_object_representations.is_primary = 1 ';
+        $repRelSql .= 'LIMIT 1;';
+
+        $repRelDbResult = $db->query($repRelSql);
+
+        while ($repRelDbResult->nextRow()) {
+          $dbRow = $repRelDbResult->getRow();
+          $hasRepresenationIds = true;
+          $row['representation_id'] = $dbRow['representation_id'];
+        }
+      }
+
+      if ($vb_add_agents) {
+        $row['entities'] = ExportService::getRelations($id, 'entities', 'entity_id', 'entity_id');
+      }
 
       $rows[] = $row;
     }
@@ -341,7 +403,7 @@ class ExportService
     if (!$vb_no_zip) {
       $csvFileName = $objectType . '.csv';
 
-      ExportService::writeCsv($path . $csvFileName, ExportService::createFlatCsvData($rows));
+      ExportService::writeCsv($path . $csvFileName, ExportService::createFlatCsvData($rows, $hasRepresenationIds));
 
       $zipFilename = $path . 'metadata.zip';
       $zip = new ZipArchive;
@@ -554,7 +616,7 @@ class ExportService
     return $attributes;
   }
 
-  private static function getRelations($caObjectId, $relatedType, $relIdKey, $idKey, &$cachedRelItems)
+  private static function getRelations($caObjectId, $relatedType, $relIdKey, $idKey, &$cachedRelItems = null)
   {
     $db = new Db();
     $relTableName = "ca_objects_x_" . $relatedType;
@@ -572,7 +634,7 @@ class ExportService
       $row = $dbResult->getRow();
       $caId = $row[$relIdKey];
 
-      if ($cachedRelItems[$caId]) {
+      if ($cachedRelItems && $cachedRelItems[$caId]) {
         $relations[] = [
           'type' => $row['type_code'],
           'item' => $cachedRelItems[$caId]
@@ -613,7 +675,10 @@ class ExportService
             'type' => $row['type_code'],
             'item' => $relItem
           ];
-          $cachedRelItems[$caId] = $relItem;
+          
+          if ($cachedRelItems) {
+            $cachedRelItems[$caId] = $relItem;
+          }
         }
       }
     }
@@ -621,10 +686,16 @@ class ExportService
     return $relations;
   }
 
-  private static function createFlatCsvData($rows)
+  private static function createFlatCsvData($rows, $hasRepresenationIds)
   {
+    $maxEntities = 0;
+
     foreach ($rows as &$row) {
       ExportService::extractAttrs($row, $attrKeys);
+
+      if (!empty($row['entities'])) {
+        $maxEntities = max($maxEntities, count($row['entities']));
+      }
     }
     unset($row);
 
@@ -641,12 +712,30 @@ class ExportService
       $header[] = $key . '.value_source';
     }
 
+    if ($hasRepresenationIds) {
+      $header[] = 'representation_id';
+    }
+
+    if ($maxEntities > 0) {
+      for ($i = 1; $i <= $maxEntities; $i++) {
+        $header[] = 'entity_' . $i . '.idno';
+        $header[] = 'entity_' . $i . '.preferred_label';
+        $header[] = 'entity_' . $i . '.type';
+      }
+    }
+
     $csvData[] = $header;
 
     foreach ($rows as &$row) {
       $rowData = [];
 
       ExportService::addRowData($rowData, $row, $attrKeys, false, true);
+
+      if ($hasRepresenationIds) {
+        $rowData[] = empty($row['representation_id']) ? '' : $row['representation_id'];
+      }
+
+      ExportService::addRelData($rowData, $row['entities'], $maxEntities, true);
 
       $csvData[] = $rowData;
     }
@@ -755,19 +844,6 @@ class ExportService
       }
     }
 
-    // $header[] = 'manifestation.idno';
-    // $header[] = 'manifestation.preferred_label';
-    // $header[] = 'manifestation.type';
-
-    // foreach ($manifestationAttrKeys as $key => $subKeys) {
-    //   foreach ($subKeys as $subKey) {
-    //     $header[] = 'manifestation.' . $key . '.' . $subKey;
-    //   }
-    //   $header[] = 'manifestation.' . $key . '.value_source';
-    // }
-
-    // Add Header - Items
-
     if (count($itemsAttrKeys) > 0) {
       foreach ($itemsAttrKeys as $index => $itemsAttrItem) {
         $headerIndex = $index + 1;
@@ -798,7 +874,6 @@ class ExportService
 
     // Add Header - Other Manifestations
 
-    // TODO: Uncomment again
     if (count($otherManifestationsAttrKeys) > 0) {
       foreach ($otherManifestationsAttrKeys as $index => $otherManifestationsAttrItem) {
         $headerIndex = $index + 1;
@@ -882,7 +957,6 @@ class ExportService
         }
       }
 
-      // TODO: Uncomment again
       if (count($otherManifestationsAttrKeys) > 0) {
         foreach ($otherManifestationsAttrKeys as $index => $otherManifestationsAttrKeysItem) {
           ExportService::addRowData($rowData, $row['subItems']['other_manifestations'][$index], $otherManifestationsAttrKeysItem, true);
@@ -946,11 +1020,15 @@ class ExportService
     }
   }
 
-  private static function addRelData(&$rowData, $rels, $maxRelItems)
+  private static function addRelData(&$rowData, $rels, $maxRelItems, $addLabel = false)
   {
     foreach ($rels as $rel) {
       $rowData[] = $rel['item']['idno'];
       $rowData[] = $rel['type'];
+
+      if ($addLabel) {
+        $rowData[] = $rel['item']['preferred_label'];
+      }
     }
 
     if (count($rels) < $maxRelItems) {

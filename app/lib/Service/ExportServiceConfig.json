@@ -1,0 +1,7 @@
+{
+  "creation_non_av_type_id": "28",
+  "creation_av_type_id": "25",
+  "item_type_id": "23",
+  "export_limit": 100000,
+  "server_base_url": "https://www.vhh-dev.max-recall.com/mmsi/api/ca/"
+}
