@@ -719,8 +719,8 @@ class ExportService
     if ($maxEntities > 0) {
       for ($i = 1; $i <= $maxEntities; $i++) {
         $header[] = 'entity_' . $i . '.idno';
-        $header[] = 'entity_' . $i . '.preferred_label';
         $header[] = 'entity_' . $i . '.type';
+        $header[] = 'entity_' . $i . '.preferred_label';
       }
     }
 
